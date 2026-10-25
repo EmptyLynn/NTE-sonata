@@ -1,0 +1,67 @@
+{
+  "name": "yihuan-piano-zcode",
+  "version": "1.0.0",
+  "description": "异环钢琴模拟器 — 虚拟键盘 + MIDI 自动演奏",
+  "main": "main.js",
+  "author": "ZCode",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "web": "node tools/serve.mjs",
+    "fetch-audio": "node tools/fetch-audio.mjs",
+    "make-demo": "node tools/make-demo-midi.mjs",
+    "dist:dir": "electron-builder --win --dir",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.zcode.yihuanpiano",
+    "productName": "异环钢琴模拟器",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "perf-main.js",
+      "perf-ffi.js",
+      "perf-worker.js",
+      "renderer/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "audio/**/*",
+          "demo/**/*",
+          "builtin/**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "异环钢琴模拟器"
+    }
+  },
+  "dependencies": {
+    "koffi": "^3.3.3"
+  }
+}

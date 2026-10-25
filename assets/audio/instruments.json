@@ -1,0 +1,130 @@
+[
+  {
+    "id": "asteel",
+    "name": "木吉他·钢弦",
+    "samples": 57,
+    "min": 52,
+    "max": 108,
+    "instr": "guitar"
+  },
+  {
+    "id": "bright",
+    "name": "明亮钢琴",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "celesta",
+    "name": "钢片琴",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "choir",
+    "name": "人声合唱",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "eguitar_clean",
+    "name": "电吉他·清音",
+    "samples": 36,
+    "min": 52,
+    "max": 87,
+    "instr": "guitar"
+  },
+  {
+    "id": "eguitar_over",
+    "name": "电吉他·过载",
+    "samples": 36,
+    "min": 52,
+    "max": 87,
+    "instr": "guitar"
+  },
+  {
+    "id": "epiano",
+    "name": "电钢琴",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "flute",
+    "name": "长笛",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "grand",
+    "name": "古典钢琴",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "guitar",
+    "name": "尼龙吉他",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "guitar"
+  },
+  {
+    "id": "harp",
+    "name": "竖琴",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "marimba",
+    "name": "马林巴",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "musicbox",
+    "name": "八音盒",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "strings",
+    "name": "弦乐合奏",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "upright",
+    "name": "明亮原声钢琴",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  },
+  {
+    "id": "vibraphone",
+    "name": "颤音琴",
+    "samples": 88,
+    "min": 21,
+    "max": 108,
+    "instr": "piano"
+  }
+]
