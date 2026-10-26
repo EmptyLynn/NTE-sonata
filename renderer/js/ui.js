@@ -94,7 +94,7 @@
         });
       }
 
-      this.log('欢迎使用异环钢琴模拟器（by 林羽empty）—— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
+      this.log('欢迎使用异环乐器模拟器（by 林羽empty）—— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
       this.log('选择本地 MIDI 后即可自动演奏；F8 播放/暂停、F9 停止（失焦可用）', 'info');
     },
 
@@ -529,7 +529,7 @@
       }
       if (line.trimEnd()) L.push(line.trimEnd());
       L.push('─'.repeat(52));
-      L.push('—— 由 异环钢琴模拟器 (by 林羽empty) 导出 ——');
+      L.push('—— 由 异环乐器模拟器 (by 林羽empty) 导出 ——');
       return L.join('\r\n') + '\r\n';
     },
 

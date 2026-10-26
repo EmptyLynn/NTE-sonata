@@ -1,4 +1,4 @@
-# 异环钢琴模拟器
+# 异环乐器模拟器
 
 一款桌面端《异环》风格乐器软件（作者：林羽empty）：**练习模式**（三排 36 键虚拟键盘 + MIDI 自动演奏，模拟器内发声）+ **演奏模式**（把 MIDI 乐谱作为真实按键弹进游戏，支持后台注入）。
 
@@ -149,8 +149,8 @@ npm run web          # http://localhost:8765/renderer/index.html
 ## 四、打包为 EXE
 
 ```bash
-npm run dist:dir     # 绿色免安装版 → dist/win-unpacked/异环钢琴模拟器.exe
-npm run dist         # NSIS 安装包     → dist/异环钢琴模拟器 Setup 1.0.0.exe
+npm run dist:dir     # 绿色免安装版 → dist12/win-unpacked/YihuanInstrument.exe
+npm run dist         # NSIS 安装包     → dist12/YihuanInstrument-Setup-<版本>.exe
 ```
 
 ### 音频如何被打包并正确加载（extraResources 原理）

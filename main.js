@@ -1,5 +1,5 @@
 /* ============================================================================
- * 异环钢琴模拟器 —— Electron 主进程
+ * 异环乐器模拟器 —— Electron 主进程
  *
  * 职责：
  *   1. 创建窗口；注册 app:// 特权协议（standard + supportFetchAPI），
@@ -75,7 +75,7 @@ function createWindow() {
     height: Math.min(1180, area.height - 40),
     minWidth: 1024,
     minHeight: 760,
-    title: '异环钢琴模拟器',
+    title: '异环乐器模拟器',
     icon: require('fs').existsSync(appIcon) ? appIcon : undefined,
     backgroundColor: '#eef0f4',
     autoHideMenuBar: true,
