@@ -76,6 +76,7 @@
       Viz.init(el.viz);
       Viz.initEcho($('echo-viz'));
       Tour.init();
+      this.initFitScale();
       setTimeout(() => { Tour.maybeAuto('practice'); this.fitWindowHeight(); }, 1400);
 
       this.initInstruments().then(() => this.handleUrlParams());
@@ -94,7 +95,7 @@
         });
       }
 
-      this.log('欢迎使用异环乐器模拟器（by 林羽empty）—— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
+      this.log('欢迎使用异环乐器模拟器（b站 @林羽empty）—— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
       this.log('选择本地 MIDI 后即可自动演奏；F8 播放/暂停、F9 停止（失焦可用）', 'info');
     },
 
@@ -465,6 +466,35 @@
       });
     },
 
+    /* ---------------- 整体等比缩放（小窗/K1 便携屏/笔记本兜底） ----------------
+     * 响应式压缩后内容仍超出窗口时，把 #app 整体按比例缩小（复印机式缩印），
+     * 保证任意窗口尺寸下所有部件完整可见。transform 不影响布局盒，
+     * 负 margin 抵消缩放后下方留白；指针事件坐标由浏览器自动映射，琴键照常可点。 */
+    initFitScale() {
+      const appEl = document.getElementById('app');
+      if (!appEl) return;
+      const apply = () => {
+        const naturalW = appEl.scrollWidth;
+        const naturalH = appEl.scrollHeight;
+        const availW = window.innerWidth - 12;
+        const availH = window.innerHeight - 6;
+        const s = Math.min(1, availW / naturalW, availH / naturalH);
+        const clamped = Math.max(0.38, s);
+        if (clamped < 0.995) {
+          appEl.style.transformOrigin = 'top center';
+          appEl.style.transform = 'scale(' + clamped.toFixed(4) + ')';
+          appEl.style.marginBottom = -Math.round(naturalH * (1 - clamped)) + 'px';
+          document.body.style.overflowX = 'hidden';
+        } else {
+          appEl.style.transform = '';
+          appEl.style.marginBottom = '';
+        }
+      };
+      window.addEventListener('resize', apply);
+      if (window.ResizeObserver) new ResizeObserver(apply).observe(appEl);
+      apply();
+    },
+
     /* ---------------- 键盘谱 TXT 导出 ----------------
      * 按当前设置（轨道/转调/超域）生成人性化键盘谱：8 分音符网格分组，
      * 每行一个起音（小节.拍 + 按键 + 唱名），每 4 小节留空行便于视读。 */
@@ -529,7 +559,7 @@
       }
       if (line.trimEnd()) L.push(line.trimEnd());
       L.push('─'.repeat(52));
-      L.push('—— 由 异环乐器模拟器 (by 林羽empty) 导出 ——');
+      L.push('—— 由 异环乐器模拟器 (b站 @林羽empty) 导出 ——');
       return L.join('\r\n') + '\r\n';
     },
 

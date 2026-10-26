@@ -68,13 +68,15 @@ function createWindow() {
   /* 自测模式：隐藏窗口 + 禁用后台节流（防止人为交互污染与定时器降频） */
   const testMode = process.argv.includes('--selftest') || process.argv.includes('--perftest');
   /* 目标 1320×1180，按主屏工作区收缩；内容高度自适应（fit-window-height）兜底 */
+  /* 目标 1320×1180，按主屏工作区收缩；内容高度自适应（fit-window-height）兜底。
+   * 最小 560×420：照顾 K1 便携屏/笔记本，布局随视口压缩（style.css 响应式段） */
   const area = screen.getPrimaryDisplay().workArea;
   const appIcon = path.join(__dirname, 'build', 'icon.ico');
   const win = new BrowserWindow({
     width: Math.min(1320, area.width - 24),
     height: Math.min(1180, area.height - 40),
-    minWidth: 1024,
-    minHeight: 760,
+    minWidth: 560,
+    minHeight: 420,
     title: '异环乐器模拟器',
     icon: require('fs').existsSync(appIcon) ? appIcon : undefined,
     backgroundColor: '#eef0f4',
@@ -200,7 +202,8 @@ function runApp() {
       if (!win || !Number.isFinite(contentHeight)) return { ok: false };
       if (win.isMaximized() || win.isFullScreen()) return { ok: true, skipped: 'maximized' };
       const area = screen.getPrimaryDisplay().workArea;
-      const desired = Math.max(720, Math.min(Math.ceil(contentHeight), area.height - 44));
+      /* 下限 430（随响应式压缩后的最小内容高），上限不超过屏幕工作区 */
+      const desired = Math.max(430, Math.min(Math.ceil(contentHeight), area.height - 44));
       const [contentW, contentH] = win.getContentSize();
       if (Math.abs(desired - contentH) <= 6) return { ok: true, skipped: 'stable' };
       try {

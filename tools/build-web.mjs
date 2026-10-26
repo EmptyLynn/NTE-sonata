@@ -57,7 +57,7 @@ html = html.replace(
 );
 html = html.replace(
   '</body>',
-  '<span class="web-badge">网页版 · 仅练习模式 · by 林羽empty</span>\n</body>',
+  '<span class="web-badge">网页版 · 仅练习模式 · b站 @林羽empty</span>\n</body>',
 );
 /* 版本号缓存穿透：Pages 的 js/css 有 10 分钟 CDN 缓存，带 ?v= 让每次部署即时生效 */
 const VER = 'v1.1.0-' + Math.random().toString(36).slice(2, 8);
