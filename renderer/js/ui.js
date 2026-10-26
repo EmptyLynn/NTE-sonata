@@ -307,6 +307,7 @@
           if (teach.wasPlaying) MidiPlayer.play();
         }
         Teaching.start(teach.off);
+        UI.log('参数已更新，跟弹已从当前位置继续', 'info');
         return;
       }
       if (playing) {
