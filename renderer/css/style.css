@@ -441,6 +441,17 @@ body.no-hints .key .hint { opacity: 0; }
 
 /* ─────────────────────────── 底部面板（可视化 / 日志） ─────────────────────────── */
 .bottom-panel { padding: 10px 12px 12px; }
+
+/* ─────────────────────────── 页脚署名 ─────────────────────────── */
+.app-footer {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 4px 0;
+  font-size: 11.5px; letter-spacing: .05em;
+  color: rgba(35, 38, 47, 0.42);
+}
+.app-footer .footer-brand { font-weight: 600; color: rgba(35, 38, 47, 0.55); }
+.app-footer .footer-sep { opacity: .5; }
+.app-footer b { font-weight: 650; color: rgba(233, 87, 110, 0.75); }
 .bottom-head {
   display: flex; align-items: center; gap: 14px;
   padding: 2px 6px 9px;
