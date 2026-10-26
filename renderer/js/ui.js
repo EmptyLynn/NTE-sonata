@@ -94,7 +94,7 @@
         });
       }
 
-      this.log('欢迎使用异环乐器模拟器（by 林羽empty）—— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
+      this.log('欢迎使用异环钢琴模拟器（by 林羽empty）—— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
       this.log('选择本地 MIDI 后即可自动演奏；F8 播放/暂停、F9 停止（失焦可用）', 'info');
     },
 
@@ -107,11 +107,26 @@
         if (files.length && window.yihuan && window.yihuan.isElectron) {
           await this.importMidiFiles(files.map((f) => f.path).filter(Boolean));
         } else if (files.length) {
-          /* 浏览器（非 Electron）回退：单文件直接载入 */
-          const f = files[0];
-          const buf = await f.arrayBuffer();
-          this.loadSong(buf, f.name);
-          this.saveToLibrary(null, buf, f.name);
+          /* 浏览器（非 Electron）回退：批量入库（IndexedDB），第一首载入播放器 */
+          await Library.refresh();
+          const have = new Set(Library.entries.map((e) => String(e.title).trim().toLowerCase()));
+          let loadedFirst = false;
+          const added = [], skipped = [];
+          for (const f of files) {
+            const buf = await f.arrayBuffer();
+            let song;
+            try { song = MidiSource.parse(buf); }
+            catch (err) { this.log(`解析失败：${f.name}（${err.message}）`, 'err'); continue; }
+            const title = song.name || f.name.replace(/\.(midi?|rmi)$/i, '') || '未命名';
+            if (have.has(title.trim().toLowerCase())) { skipped.push(title); continue; }
+            have.add(title.trim().toLowerCase());
+            added.push(title);
+            const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo };
+            Library.add({ data: buf, title, meta });
+            if (!loadedFirst) { loadedFirst = true; this.loadSong(buf, f.name); }
+          }
+          if (skipped.length) this.log(`已跳过曲库中已有的同名曲目：${skipped.join('、')}`, 'warn');
+          if (added.length > 1) this.log(`批量导入完成：新增 ${added.length} 首入库，当前加载「${added[0]}」`, 'info');
         }
         el.fileInput.value = '';
       });
@@ -215,6 +230,14 @@
         const isTextInput = t.tagName === 'INPUT' && !['range', 'button', 'checkbox', 'radio'].includes(type);
         if (t.tagName === 'SELECT' || isTextInput) t.blur();
       });
+      /* 按钮点击后归还焦点：否则空格/回车会再次触发最后点过的按钮
+       * （如导出键盘谱后按空格会再弹保存框）。e.detail>0 = 鼠标点击；
+       * 键盘 Enter 触发的 click（detail=0）不.blur，保留无障碍键盘操作。 */
+      document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (!t || t.tagName !== 'BUTTON' || e.detail === 0) return;
+        t.blur();
+      });
 
       /* 底部面板页签：瀑布流 / 实时日志 */
       el.tabViz.addEventListener('click', () => this.switchTab('viz'));
@@ -269,9 +292,23 @@
         if (playing) setTimeout(() => { if (Perf.state === 'paused') Perf.resume(); }, gapMs);
         return;
       }
+      /* 教学中改参数：教学和弦必须随新队列重建，否则判定与显示失配 → 等待模式卡死。
+       * 从当前教学位置无缝续跟（等待=驻留位置，同步=播放位置）。 */
+      const teach = Teaching.active ? { mode: Teaching.mode, off: Teaching.songTimeNow(), wasPlaying: MidiPlayer.state === 'playing' } : null;
+      if (teach) Teaching.stop();
       const playing = MidiPlayer.state === 'playing';
       if (playing) MidiPlayer.pause();
       apply();
+      if (teach) {
+        Teaching.mode = teach.mode;
+        if (teach.mode === 'flow') {
+          /* MidiPlayer.stop() 会把播放头归零：flow 续跟必须先 seek 回原位置 */
+          MidiPlayer.seek(teach.off);
+          if (teach.wasPlaying) MidiPlayer.play();
+        }
+        Teaching.start(teach.off);
+        return;
+      }
       if (playing) {
         setTimeout(() => {
           if (MidiPlayer.state === 'paused') MidiPlayer.play();
@@ -491,7 +528,7 @@
       }
       if (line.trimEnd()) L.push(line.trimEnd());
       L.push('─'.repeat(52));
-      L.push('—— 由 异环乐器模拟器 (by 林羽empty) 导出 ——');
+      L.push('—— 由 异环钢琴模拟器 (by 林羽empty) 导出 ——');
       return L.join('\r\n') + '\r\n';
     },
 
@@ -501,6 +538,8 @@
       Keyboard.setInstrument(id);
       el.instPiano.classList.toggle('active', id === 'piano');
       el.instGuitar.classList.toggle('active', id === 'guitar');
+      /* 切乐器：教学和弦按旧键位生成，已失效 → 先结束教学（重新点播放即可开始） */
+      if (Teaching.active) Teaching.stop();
       /* 关键：切乐器后一律重建演奏调度（无条件）——停止态不重建会让旧乐器的
        * 键位映射残留到下一次演奏，把"域外音"打进游戏 */
       if (MidiPlayer.song) {

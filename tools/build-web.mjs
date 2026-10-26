@@ -95,12 +95,12 @@ fs.writeFileSync(
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>异环乐器模拟器 · 练习模式</title>
+  <title>异环钢琴模拟器 · 练习模式</title>
   <meta http-equiv="refresh" content="0;url=./renderer/">
   <style>body{font-family:"Segoe UI","Microsoft YaHei UI",sans-serif;background:#eef0f4;display:grid;place-items:center;height:100vh;margin:0;color:#2c3040}</style>
 </head>
 <body>
-  <a href="./renderer/" style="font-size:18px">进入 异环乐器模拟器（练习模式）→</a>
+  <a href="./renderer/" style="font-size:18px">进入 异环钢琴模拟器（练习模式）→</a>
 </body>
 </html>
 `,

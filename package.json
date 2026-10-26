@@ -1,7 +1,7 @@
 {
   "name": "yihuan-piano-zcode",
   "version": "1.1.0",
-  "description": "异环乐器模拟器 — 钢琴/吉他双乐器虚拟键盘 + MIDI 演奏",
+  "description": "异环钢琴模拟器 — 钢琴/吉他双乐器虚拟键盘 + MIDI 演奏",
   "main": "main.js",
   "author": "林羽empty <969761220@qq.com>",
   "license": "MIT",
@@ -60,7 +60,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "异环乐器模拟器",
+      "shortcutName": "异环钢琴模拟器",
       "artifactName": "YihuanInstrument-Setup-${version}.${ext}"
     }
   },

@@ -84,7 +84,10 @@ function strikeChord(chord) {
   for (let i = 0; i < keys.length; i++) {
     const spec = keys[i];
     const dur = Math.max(HOLD_MIN_MS, Math.min(HOLD_MAX_MS, durs ? durs[i] : S.holdMs));
-    if (S.holds.has(spec)) releaseHold(spec); /* 重击：先抬后按 */
+    if (S.holds.has(spec)) {
+      releaseHold(spec); /* 重击：先抬后按，留出间隔确保游戏重新触发 */
+      sleep(4);
+    }
     const vks = specToVks(spec);
     const mods = [];
     if (vks.length > 1) { mods.push(vks[0]); acquireMod(vks[0]); }
@@ -179,7 +182,8 @@ parentPort.on('message', (m) => {
     }
     startPlay(m);
   } else if (m.type === 'pause') {
-    if (!S.running || S.paused) { post({ type: 'paused', t: S.offsetMs / 1000, already: true }); return; }
+    if (!S.running) { post({ type: 'paused', t: 0, already: true }); return; } /* 未运行报 t=0，主进程映射为 stopped */
+    if (S.paused) { post({ type: 'paused', t: S.offsetMs / 1000, already: true }); return; }
     S.paused = true;
     S.offsetMs = Math.max(0, nowMs() - S.anchorMs);
     releaseAllHolds(); /* 暂停即抬键：游戏内不残留长音 */
