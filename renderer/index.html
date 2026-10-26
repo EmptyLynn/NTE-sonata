@@ -36,6 +36,7 @@
       </div>
       <div class="hotkey-hints">
         <button id="btn-tour" class="btn btn-ghost" title="新手引导（重新观看讲解）">? 教程</button>
+        <button id="btn-settings" class="btn btn-ghost" title="个性化设置（主题色 / 回声条 / 粒子）">⚙ 设置</button>
         <span class="hint-chip"><kbd>Shift</kbd><em>高半音</em></span>
         <span class="hint-chip"><kbd>Ctrl</kbd><em>低半音</em></span>
         <span class="hint-chip"><kbd>F8</kbd><em>播放/暂停</em></span>
@@ -141,10 +142,6 @@
             </span>
           </label>
           <button id="btn-export-chart" class="btn btn-export" title="按当前设置将整曲按键导出为 txt 键盘谱">⌨ 导出键盘谱</button>
-          <label class="ctl" title="弹奏时瀑布流回声音条的颜色">
-            <span class="ctl-name">回声</span>
-            <input id="echo-color" type="color" value="#e9576e">
-          </label>
           <label class="ctl ctl-audio">
             <span class="ctl-name">音色</span>
             <span class="sel-wrap">
@@ -307,6 +304,85 @@
       <div id="countdown-num" class="countdown-num">3</div>
       <div id="countdown-text" class="countdown-text"></div>
       <button id="countdown-cancel" class="btn">取消演奏</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ 个性化设置弹窗 ═══════════ -->
+  <div id="settings-modal" class="lib-modal hidden">
+    <div class="lib-backdrop" id="settings-backdrop"></div>
+    <div class="lib-dialog settings-dialog">
+      <header class="lib-head">
+        <h2>⚙ 个性化设置</h2>
+        <div class="lib-head-actions">
+          <button id="settings-close" class="btn btn-ghost" title="关闭 (Esc)">✕ 关闭</button>
+        </div>
+      </header>
+
+      <!-- 回声条 -->
+      <section class="set-section">
+        <h3 class="set-title">回声条</h3>
+        <div class="set-row">
+          <span class="set-label">色彩</span>
+          <div class="swatch-row" id="echo-swatches">
+            <button class="swatch" data-echo="#39b98c" style="background:#39b98c" title="翠绿（默认）"></button>
+            <button class="swatch" data-echo="#e9576e" style="background:#e9576e" title="玫瑰"></button>
+            <button class="swatch" data-echo="#4f7cf0" style="background:#4f7cf0" title="海洋蓝"></button>
+            <button class="swatch" data-echo="#9b6ef3" style="background:#9b6ef3" title="星紫"></button>
+            <button class="swatch" data-echo="#f0a635" style="background:#f0a635" title="暖橙"></button>
+            <label class="swatch swatch-custom" title="自定义颜色">
+              <input type="color" id="echo-custom" value="#39b98c">
+              <span>＋</span>
+            </label>
+            <button class="swatch swatch-rainbow" data-echo="rainbow" title="炫彩：色相随时间流转，低音暖高音冷"></button>
+          </div>
+        </div>
+        <p class="set-hint">弹奏 / 自动播放时，回声条按所选色彩上升；炫彩模式每颗音符都有自己的颜色。</p>
+      </section>
+
+      <!-- 主题色 -->
+      <section class="set-section">
+        <h3 class="set-title">主题色</h3>
+        <div class="set-row">
+          <span class="set-label">点缀色</span>
+          <div class="swatch-row" id="theme-swatches">
+            <button class="swatch" data-theme="#e9576e" style="background:#e9576e" title="玫瑰（默认）"></button>
+            <button class="swatch" data-theme="#4f7cf0" style="background:#4f7cf0" title="海洋蓝"></button>
+            <button class="swatch" data-theme="#9b6ef3" style="background:#9b6ef3" title="星紫"></button>
+            <button class="swatch" data-theme="#39b98c" style="background:#39b98c" title="翠绿"></button>
+            <button class="swatch" data-theme="#f0a635" style="background:#f0a635" title="暖橙"></button>
+            <button class="swatch" data-theme="#38b6c9" style="background:#38b6c9" title="青碧"></button>
+          </div>
+        </div>
+        <p class="set-hint">按钮、滑杆、主旋律音符与判定线会一并换色。</p>
+      </section>
+
+      <!-- 视觉效果 -->
+      <section class="set-section">
+        <h3 class="set-title">视觉效果</h3>
+        <div class="set-row">
+          <span class="set-label">粒子反馈</span>
+          <button id="set-particles" class="switch on" role="switch" aria-checked="true" title="音符触底时迸发粒子"><i></i></button>
+        </div>
+        <p class="set-hint">关闭后音符触底不再迸发粒子（低配机器更流畅）。</p>
+      </section>
+
+      <!-- 关于 -->
+      <section class="set-section set-about">
+        <h3 class="set-title">关于</h3>
+        <div class="link-cards">
+          <a class="link-card" href="https://space.bilibili.com/" target="_blank" rel="noopener" id="link-bilibili">
+            <span class="link-ic bilibili"></span>
+            <span class="link-txt"><b>B站主页</b><em>@林羽empty</em></span>
+            <span class="link-arrow">→</span>
+          </a>
+          <a class="link-card" href="https://github.com/EmptyLynn" target="_blank" rel="noopener" id="link-github">
+            <span class="link-ic github"></span>
+            <span class="link-txt"><b>GitHub</b><em>@EmptyLynn</em></span>
+            <span class="link-arrow">→</span>
+          </a>
+        </div>
+        <p class="set-sig">异环乐器模拟器 · 设计与开发 <b>b站 @林羽empty</b></p>
+      </section>
     </div>
   </div>
 

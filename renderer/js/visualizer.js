@@ -20,6 +20,27 @@ const Viz = {
   _laneLabelY: new Map(), /* 教学标签去堆叠：车道 → 上个标签的 yBottom */
   PAL: ['#e9576e', '#4f7cf0', '#39b98c', '#f0a635', '#9b6ef3', '#38b6c9', '#e07b9a', '#7f95c9'],
   MELODY: '#e9576e',
+  accentRGB: [233, 87, 110], /* 随主题色更新（ui.applyAccent） */
+  particlesEnabled: true,    /* 设置面板可关：关闭后瀑布流不再迸发粒子 */
+  echoRainbow: false,        /* 炫彩回声：开启时忽略 echoColor */
+
+  accentRGBA(a) {
+    const c = this.accentRGB;
+    return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + Math.min(1, a).toFixed(3) + ')';
+  },
+
+  /* 炫彩回声：色相随时间流转 + 音高偏移，低音暖高音冷 */
+  rainbowColor(midi) {
+    const hue = ((Date.now() / 28) + midi * 2.4) % 360;
+    return 'hsl(' + hue.toFixed(0) + ', 80%, 62%)';
+  },
+
+  noteOn(midi, color) {
+    if (this.presses.some((p) => p.midi === midi && p.releasedAt == null)) return; /* 同键去重 */
+    const c = color || (this.echoRainbow ? this.rainbowColor(midi) : (this.echoColor || this.MELODY));
+    this.presses.push({ midi, born: performance.now(), releasedAt: null, color: c });
+  },
+
   SOLFEGE: ['1', '#1', '2', '♭3', '3', '4', '#4', '5', '#5', '6', '♭7', '7'],
   FONT: '"Segoe UI", "Microsoft YaHei UI", sans-serif',
 
@@ -86,12 +107,7 @@ const Viz = {
   },
 
   /* 回声条记录：由 Keyboard.press/release 在「0→1 / 1→0」过渡时调用，
-   * 覆盖手动、MIDI 播放、教学、演奏全部按键来源 */
-  noteOn(midi, color) {
-    if (this.presses.some((p) => p.midi === midi && p.releasedAt == null)) return; /* 同键去重 */
-    this.presses.push({ midi, born: performance.now(), releasedAt: null, color: color || this.echoColor || this.MELODY });
-  },
-
+   * 覆盖手动、MIDI 播放、教学、演奏全部按键来源（noteOn 定义在对象头部，含炫彩逻辑） */
   noteOff(midi) {
     for (let i = this.presses.length - 1; i >= 0; i--) {
       if (this.presses[i].midi === midi && this.presses[i].releasedAt == null) {
@@ -188,14 +204,15 @@ const Viz = {
     }
     /* 判定线 */
     const line = c.createLinearGradient(0, 0, E.W, 0);
-    line.addColorStop(0, 'rgba(233,87,110,0.05)');
-    line.addColorStop(0.5, 'rgba(233,87,110,0.75)');
-    line.addColorStop(1, 'rgba(233,87,110,0.05)');
+    line.addColorStop(0, this.accentRGBA(0.05));
+    line.addColorStop(0.5, this.accentRGBA(0.75));
+    line.addColorStop(1, this.accentRGBA(0.05));
     c.fillStyle = line;
     c.fillRect(0, hitY, E.W, 2);
   },
 
     burst(midi, color) {
+    if (this.particlesEnabled === false) return; /* 设置面板：粒子反馈关闭 */
     const { x, w } = this.laneRect(midi);
     const hitY = this.H - 30;
     const c = color || this.MELODY;
@@ -408,12 +425,12 @@ const Viz = {
 
     /* ---- 触底线 ---- */
     const line = c.createLinearGradient(0, 0, this.W, 0);
-    line.addColorStop(0, 'rgba(233,87,110,0.05)');
-    line.addColorStop(0.5, 'rgba(233,87,110,0.75)');
-    line.addColorStop(1, 'rgba(233,87,110,0.05)');
+    line.addColorStop(0, this.accentRGBA(0.05));
+    line.addColorStop(0.5, this.accentRGBA(0.75));
+    line.addColorStop(1, this.accentRGBA(0.05));
     c.fillStyle = line;
     c.fillRect(0, hitY, this.W, 2);
-    c.fillStyle = 'rgba(233,87,110,0.18)';
+    c.fillStyle = this.accentRGBA(0.18);
     c.fillRect(0, hitY + 2, this.W, 6);
 
     /* ---- 底部简谱标注条：自然音清晰、半音淡色；被弹到的音随闪光点亮 ---- */
@@ -468,6 +485,7 @@ const Viz = {
   },
 
   _alpha(hex, a) {
+    if (typeof hex !== 'string' || hex[0] !== '#') return hex; /* hsl() 等原样返回（透明度由 globalAlpha 控制） */
     const n = parseInt(hex.slice(1), 16);
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${Math.min(1, a).toFixed(3)})`;
   },

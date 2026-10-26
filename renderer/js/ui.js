@@ -23,7 +23,6 @@
     rangeMode: $('range-mode'), instSel: $('inst-sel'), volume: $('volume'),
     sustain: $('sustain'), sustainVal: $('sustain-val'),
     teachSel: $('teach-sel'), exportChart: $('btn-export-chart'),
-    echoColor: $('echo-color'),
     instPiano: $('instr-piano'), instGuitar: $('instr-guitar'),
     songName: $('song-name'), songMeta: $('song-meta'),
     keyboard: $('keyboard'), hints: $('btn-hints'),
@@ -203,8 +202,33 @@
         Teaching.setMode(el.teachSel.value);
         this.saveSettings();
       });
-      el.echoColor.addEventListener('input', () => {
-        Viz.echoColor = el.echoColor.value;
+      /* ── 个性化设置面板 ── */
+      document.getElementById('btn-settings').addEventListener('click', () => this.openSettings());
+      document.getElementById('settings-close').addEventListener('click', () => this.closeSettings());
+      document.getElementById('settings-backdrop').addEventListener('click', () => this.closeSettings());
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !document.getElementById('settings-modal').classList.contains('hidden')) this.closeSettings();
+      });
+      document.querySelectorAll('#echo-swatches .swatch').forEach((b) => {
+        b.addEventListener('click', () => {
+          const v = b.dataset.echo;
+          this._echoRainbow = v === 'rainbow';
+          if (v !== 'rainbow') this._echoColor = v;
+          this.applyEchoColor();
+          this.saveSettings();
+        });
+      });
+      document.getElementById('echo-custom').addEventListener('input', (e) => {
+        this._echoRainbow = false;
+        this._echoColor = e.target.value;
+        this.applyEchoColor();
+        this.saveSettings();
+      });
+      document.querySelectorAll('#theme-swatches .swatch').forEach((b) => {
+        b.addEventListener('click', () => { this.applyAccent(b.dataset.theme); this.saveSettings(); });
+      });
+      document.getElementById('set-particles').addEventListener('click', () => {
+        this.applyParticles(!this._particles);
         this.saveSettings();
       });
       el.exportChart.addEventListener('click', () => this.exportChartTxt());
@@ -779,6 +803,49 @@
     loadSettings() {
       try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
     },
+
+    /* ── 个性化应用 ── */
+    applyEchoColor() {
+      Viz.echoColor = this._echoColor || '#39b98c';
+      Viz.echoRainbow = !!this._echoRainbow;
+      document.querySelectorAll('#echo-swatches .swatch').forEach((b) => {
+        const v = b.dataset.echo;
+        b.classList.toggle('active', this._echoRainbow ? v === 'rainbow' : v === this._echoColor);
+      });
+      const custom = document.getElementById('echo-custom');
+      if (custom && !this._echoRainbow) custom.value = this._echoColor;
+    },
+    applyAccent(hex) {
+      this._themeAccent = hex;
+      const n = parseInt(hex.slice(1), 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      const d = (v) => Math.round(v * 0.74);
+      const root = document.documentElement.style;
+      root.setProperty('--accent', hex);
+      root.setProperty('--accent-rgb', r + ', ' + g + ', ' + b);
+      root.setProperty('--accent-deep', 'rgb(' + d(r) + ',' + d(g) + ',' + d(b) + ')');
+      Viz.MELODY = hex;
+      Viz.accentRGB = [r, g, b];
+      document.querySelectorAll('#theme-swatches .swatch').forEach((el) => {
+        el.classList.toggle('active', el.dataset.theme === hex);
+      });
+    },
+    applyParticles(on) {
+      this._particles = on !== false;
+      Viz.particlesEnabled = this._particles;
+      const sw = document.getElementById('set-particles');
+      if (sw) {
+        sw.classList.toggle('on', this._particles);
+        sw.setAttribute('aria-checked', String(this._particles));
+      }
+    },
+    openSettings() {
+      document.getElementById('settings-modal').classList.remove('hidden');
+      this.applyEchoColor(); /* 同步选中环 */
+    },
+    closeSettings() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    },
     saveSettings() {
       const s = {
         speed: parseFloat(el.speed.value),
@@ -791,7 +858,10 @@
         instrument: el.instSel.value,
         teaching: el.teachSel.value,
         instrument: Keyboard.instrument,
-        echoColor: el.echoColor.value,
+        echoColor: this._echoColor || '#39b98c',
+        echoRainbow: !!this._echoRainbow,
+        themeAccent: this._themeAccent || '#e9576e',
+        particles: this._particles !== false,
         hints: Keyboard.hintsVisible,
         bottomTab: el.tabEcho.classList.contains('active') ? 'echo'
           : el.tabLog.classList.contains('active') ? 'log' : 'viz',
@@ -838,10 +908,12 @@
         el.instPiano.classList.toggle('active', s.instrument === 'piano');
         el.instGuitar.classList.toggle('active', s.instrument === 'guitar');
       }
-      if (typeof s.echoColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.echoColor)) {
-        el.echoColor.value = s.echoColor;
-        Viz.echoColor = s.echoColor;
-      }
+      /* 个性化：回声色彩 / 主题色 / 粒子（默认样式 = 全新用户的所见） */
+      this._echoColor = (typeof s.echoColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.echoColor)) ? s.echoColor : '#39b98c';
+      this._echoRainbow = !!s.echoRainbow;
+      this.applyEchoColor();
+      this.applyAccent((typeof s.themeAccent === 'string' && /^#[0-9a-f]{6}$/i.test(s.themeAccent)) ? s.themeAccent : '#e9576e');
+      this.applyParticles(s.particles !== false);
       if (s.teaching && s.teaching !== 'off') {
         el.teachSel.value = s.teaching;
         Teaching.mode = s.teaching;
@@ -1010,6 +1082,7 @@
         this.switchTab('echo'); /* 回声页签可见（画布全尺寸） */
         const r = await fetch('../assets/demo/demo1_%E5%B0%8F%E6%98%9F%E6%98%9F_%E5%8D%95%E8%BD%A8.mid');
         this.loadSong(await r.arrayBuffer(), '小星星');
+        Viz.echoRainbow = false; /* 测试需要确定色 */
         Viz.echoColor = '#20c997';
         window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', bubbles: true }));
         await sleep(700);
