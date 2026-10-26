@@ -433,7 +433,9 @@ const Viz = {
     c.fillStyle = this.accentRGBA(0.18);
     c.fillRect(0, hitY + 2, this.W, 6);
 
-    /* ---- 底部简谱标注条：自然音清晰、半音淡色；被弹到的音随闪光点亮 ---- */
+    /* ---- 底部标注条：钢琴=简谱（自然音清晰、半音淡色）；吉他=音名（与琴键标注一致）。
+     * 被弹到的音随闪光点亮 ---- */
+    const isGuitar = Keyboard.instrument === 'guitar';
     const flashMap = new Map();
     for (const f of this.flashes) {
       if (!flashMap.has(f.midi)) {
@@ -444,26 +446,26 @@ const Viz = {
     c.textBaseline = 'middle';
     for (let midi = Keyboard.min; midi <= Keyboard.max; midi++) {
       const { x, w, off } = this.laneRect(midi);
-      const acc = [1, 3, 6, 8, 10].includes(off);
+      const acc = !isGuitar && [1, 3, 6, 8, 10].includes(off);
       const flash = flashMap.get(midi);
       if (flash) {
-        c.font = `700 ${acc ? 9.5 : 10.5}px ${this.FONT}`;
+        c.font = `700 ${acc ? 9.5 : isGuitar ? 9.5 : 10.5}px ${this.FONT}`;
         c.fillStyle = this._alpha(flash.color, 0.35 + 0.65 * flash.a);
       } else {
-        c.font = `${acc ? '' : '600 '}${acc ? 9 : 10}px ${this.FONT}`;
+        c.font = `${acc ? '' : '600 '}${acc ? 9 : isGuitar ? 9 : 10}px ${this.FONT}`;
         c.fillStyle = acc ? 'rgba(35,38,47,0.26)' : 'rgba(35,38,47,0.48)';
       }
-      c.fillText(this.SOLFEGE[off], x + w / 2, hitY + 16);
+      c.fillText(isGuitar ? midiToName(midi) : this.SOLFEGE[off], x + w / 2, hitY + 16);
     }
-    /* 每组起始（低/中/高的"1"）加一个细分隔点，强化三组视觉分段 */
-    for (const bandMidi of [48, 60, 72]) {
+    /* 每组起始加一个细分隔线，强化三组视觉分段（行基随当前乐器） */
+    const bandBases = Keyboard.ROWS.map((r) => r.base).sort((a, b) => a - b);
+    for (const bandMidi of bandBases) {
+      if (bandMidi === bandBases[0]) continue;
       const { x } = this.laneRect(bandMidi);
-      if (bandMidi > 48) {
-        c.strokeStyle = 'rgba(35,38,47,0.10)';
-        c.setLineDash([2, 3]);
-        c.beginPath(); c.moveTo(x - 1.5, hitY + 8); c.lineTo(x - 1.5, this.H - 4); c.stroke();
-        c.setLineDash([]);
-      }
+      c.strokeStyle = 'rgba(35,38,47,0.10)';
+      c.setLineDash([2, 3]);
+      c.beginPath(); c.moveTo(x - 1.5, hitY + 8); c.lineTo(x - 1.5, this.H - 4); c.stroke();
+      c.setLineDash([]);
     }
 
     /* ---- 粒子 ---- */
