@@ -37,6 +37,8 @@ html = html.replace(
   `<style>
   /* 网页版：演奏模式依赖 Win32 按键注入，仅桌面版提供 */
   #mode-perf, #perf-panel { display: none !important; }
+  /* F8/F9 为桌面版全局热键，网页版无效 */
+  .web-hide { display: none !important; }
   .web-badge {
     position: fixed; right: 14px; bottom: 10px; z-index: 9;
     font-size: 11px; letter-spacing: .04em;
@@ -46,10 +48,45 @@ html = html.replace(
 </head>`,
 );
 html = html.replace(
+  '<span class="hint-chip"><kbd>F8</kbd><em>播放/暂停</em></span>',
+  '<span class="hint-chip web-hide"><kbd>F8</kbd><em>播放/暂停</em></span>',
+);
+html = html.replace(
+  '<span class="hint-chip"><kbd>F9</kbd><em>停止</em></span>',
+  '<span class="hint-chip web-hide"><kbd>F9</kbd><em>停止</em></span>',
+);
+html = html.replace(
   '</body>',
   '<span class="web-badge">网页版 · 仅练习模式 · by 林羽empty</span>\n</body>',
 );
+/* 版本号缓存穿透：Pages 的 js/css 有 10 分钟 CDN 缓存，带 ?v= 让每次部署即时生效 */
+const VER = 'v1.1.0-' + Math.random().toString(36).slice(2, 8);
+html = html.replace(/(src="(js|vendor)\/[^"]+)"/g, `$1?${VER}"`);
+html = html.replace(/(href="css\/[^"]+)"/g, `$1?${VER}"`);
 fs.writeFileSync(indexPath, html);
+
+/* 教程适配：不自动弹出（首步提及演奏模式/F8/F9 为桌面专属，顶栏「?」仍可手动查看） */
+const tourPath = path.join(OUT, 'renderer', 'js', 'tour.js');
+let tour = fs.readFileSync(tourPath, 'utf8');
+tour = tour.replace(
+  `  maybeAuto(key) {
+    if (this.done[key]) return false;
+    this.start(key, false);
+    return true;
+  },`,
+  `  maybeAuto(key) {
+    return false; /* 网页版：教程不自动弹出，顶栏「?」可手动查看 */
+  },`,
+);
+tour = tour.replace(
+  '\\n🎮 演奏模式：把按键发给游戏窗口，在《异环》里自动弹琴（切过去会有单独的引导）。',
+  '\\n（网页版仅提供练习模式。）',
+);
+tour = tour.replace(
+  '\\n全局热键：F8 播放/暂停，F9 停止（窗口失焦也有效）；Esc 紧急静音。',
+  '\\n（网页版无全局热键，请点按钮控制。）',
+);
+fs.writeFileSync(tourPath, tour);
 
 /* 入口跳转页 + 关闭 Jekyll */
 fs.writeFileSync(
