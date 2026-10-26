@@ -57,16 +57,19 @@ const Teaching = {
       const group = [];
       let j = i;
       while (j < evs.length && evs[j].t - base <= 0.005) { group.push(evs[j]); j++; }
-      /* 同和弦重复音去重（保留一个） */
+      /* 同和弦重复音去重（保留一个）；无对应琴键的音剔除（不可弹，留着会让
+       * 等待模式永远差一颗音 → 全绿后仍卡住） */
       const seen = new Set();
       const midis = [];
       const uniq = [];
       for (const ev of group) {
         if (seen.has(ev.midi)) continue;
         seen.add(ev.midi);
+        if (typeof Keyboard !== 'undefined' && !Keyboard.keyEls.has(ev.midi)) continue;
         midis.push(ev.midi);
         uniq.push(ev);
       }
+      if (!midis.length) { i = j; continue; } /* 整和弦无键可按 → 跳过 */
       chords.push({ t: base, midis, evs: uniq, hit: new Set(), done: false });
       i = j;
     }

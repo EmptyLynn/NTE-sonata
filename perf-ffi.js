@@ -154,11 +154,15 @@ function pressGroup(hwnd, keys, modifier, holdMs, mode, sleep) {
   }
 }
 
+/* 激活欺骗：让后台游戏以为自己是活动窗口（50ms 超时，防游戏忙时卡住调用线程） */
+function spoofActivate(hwnd) {
+  F.SendMessageTimeoutW(hwnd, WM_ACTIVATE, BigInt(WA_CLICKACTIVE), 0n, SMTO_NORMAL, 50, _resultBuf);
+}
+
 /* 执行和弦：keys = ['z' | 'shift+z' | 'ctrl+v' ...] */
 function executeChord(hwnd, keys, holdMs, mode, sleep) {
   if (mode === 'bg') {
-    /* 激活欺骗（50ms 超时，防游戏忙时卡住调用线程） */
-    F.SendMessageTimeoutW(hwnd, WM_ACTIVATE, BigInt(WA_CLICKACTIVE), 0n, SMTO_NORMAL, 50, _resultBuf);
+    spoofActivate(hwnd);
   }
   const normal = [], shift = [], ctrl = [];
   for (const spec of keys) {
@@ -242,6 +246,6 @@ function runAsAdmin(exe, args, dir) {
 module.exports = {
   F, VK, WM_KEYDOWN, WM_KEYUP,
   listWindows, findGameWindow, isGameTitle,
-  keyLparam, postKey, executeChord, forceForeground, diagnose,
+  keyLparam, postKey, executeChord, forceForeground, diagnose, spoofActivate,
   isElevated, isTargetElevated, runAsAdmin,
 };

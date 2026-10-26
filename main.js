@@ -1,5 +1,5 @@
 /* ============================================================================
- * 异环钢琴模拟器 —— Electron 主进程
+ * 异环乐器模拟器 —— Electron 主进程
  *
  * 职责：
  *   1. 创建窗口；注册 app:// 特权协议（standard + supportFetchAPI），
@@ -69,12 +69,14 @@ function createWindow() {
   const testMode = process.argv.includes('--selftest') || process.argv.includes('--perftest');
   /* 目标 1320×1180，按主屏工作区收缩；内容高度自适应（fit-window-height）兜底 */
   const area = screen.getPrimaryDisplay().workArea;
+  const appIcon = path.join(__dirname, 'build', 'icon.ico');
   const win = new BrowserWindow({
     width: Math.min(1320, area.width - 24),
     height: Math.min(1180, area.height - 40),
     minWidth: 1024,
     minHeight: 760,
-    title: '异环钢琴模拟器',
+    title: '异环乐器模拟器',
+    icon: require('fs').existsSync(appIcon) ? appIcon : undefined,
     backgroundColor: '#eef0f4',
     autoHideMenuBar: true,
     webPreferences: {
@@ -233,15 +235,19 @@ function runApp() {
 ipcMain.handle('pick-midi', async () => {
   const win = BrowserWindow.getAllWindows()[0];
   const res = await dialog.showOpenDialog(win, {
-    title: '选择 MIDI 文件',
+    title: '选择 MIDI 文件（可按住 Ctrl 多选批量导入）',
     filters: [
       { name: 'MIDI 文件', extensions: ['mid', 'midi', 'rmi'] },
       { name: '所有文件', extensions: ['*'] },
     ],
-    properties: ['openFile'],
+    properties: ['openFile', 'multiSelections'],
   });
   if (res.canceled || !res.filePaths.length) return null;
-  return { path: res.filePaths[0], name: path.basename(res.filePaths[0]) };
+  return {
+    path: res.filePaths[0],
+    name: path.basename(res.filePaths[0]),
+    paths: res.filePaths, /* 批量导入：全部选中路径 */
+  };
 });
 
 ipcMain.handle('read-midi', (_e, filePath) => {

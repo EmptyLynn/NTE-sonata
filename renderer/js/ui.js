@@ -94,16 +94,21 @@
         });
       }
 
-      this.log('欢迎使用异环钢琴模拟器 —— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
+      this.log('欢迎使用异环乐器模拟器（by 林羽empty）—— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
       this.log('选择本地 MIDI 后即可自动演奏；F8 播放/暂停、F9 停止（失焦可用）', 'info');
     },
 
     /* ---------------- 控件 ---------------- */
     bindControls() {
       el.pick.addEventListener('click', () => this.pickFile());
+      el.fileInput.multiple = true; /* 批量导入 */
       el.fileInput.addEventListener('change', async () => {
-        const f = el.fileInput.files[0];
-        if (f) {
+        const files = [...el.fileInput.files];
+        if (files.length && window.yihuan && window.yihuan.isElectron) {
+          await this.importMidiFiles(files.map((f) => f.path).filter(Boolean));
+        } else if (files.length) {
+          /* 浏览器（非 Electron）回退：单文件直接载入 */
+          const f = files[0];
           const buf = await f.arrayBuffer();
           this.loadSong(buf, f.name);
           this.saveToLibrary(null, buf, f.name);
@@ -486,7 +491,7 @@
       }
       if (line.trimEnd()) L.push(line.trimEnd());
       L.push('─'.repeat(52));
-      L.push('—— 由 异环钢琴模拟器 导出 ——');
+      L.push('—— 由 异环乐器模拟器 (by 林羽empty) 导出 ——');
       return L.join('\r\n') + '\r\n';
     },
 
@@ -496,9 +501,10 @@
       Keyboard.setInstrument(id);
       el.instPiano.classList.toggle('active', id === 'piano');
       el.instGuitar.classList.toggle('active', id === 'guitar');
-      /* 关键：切乐器后重建演奏调度（否则沿用旧乐器的键位映射） */
+      /* 关键：切乐器后一律重建演奏调度（无条件）——停止态不重建会让旧乐器的
+       * 键位映射残留到下一次演奏，把"域外音"打进游戏 */
       if (MidiPlayer.song) {
-        if (Perf.active || Perf.state !== 'stopped') Perf.rebuild();
+        Perf.rebuild();
         MidiPlayer.rebuild(false);
       }
       this.rebuildTimbreOptions(id);
@@ -586,13 +592,40 @@
       if (window.yihuan && window.yihuan.isElectron) {
         const picked = await window.yihuan.pickMidiFile();
         if (!picked) return;
-        const res = await window.yihuan.readMidiFile(picked.path);
-        if (!res.ok) { this.log('读取文件失败：' + res.error, 'err'); return; }
-        this.loadSong(res.data, picked.name);
-        this.saveToLibrary(picked.path, null, picked.name);
+        await this.importMidiFiles(picked.paths || [picked.path]);
       } else {
         el.fileInput.click();
       }
+    },
+
+    /* 批量导入：解析校验 + 重名拒绝（曲库已有同名曲目则跳过），加载第一首新曲 */
+    async importMidiFiles(paths) {
+      await Library.refresh();
+      const have = new Set(Library.entries.map((e) => String(e.title).trim().toLowerCase()));
+      const added = [], skipped = [];
+      let loadedFirst = false;
+      for (const p of paths) {
+        const name = p.split(/[\\/]/).pop();
+        const res = await window.yihuan.readMidiFile(p);
+        if (!res.ok) { this.log(`读取失败：${name}（${res.error}）`, 'err'); continue; }
+        let song;
+        try { song = MidiSource.parse(res.data); }
+        catch (err) { this.log(`解析失败：${name}（${err.message}）`, 'err'); continue; }
+        const title = song.name || name.replace(/\.(midi?|rmi)$/i, '') || '未命名';
+        if (have.has(title.trim().toLowerCase())) { skipped.push(title); continue; }
+        have.add(title.trim().toLowerCase());
+        added.push(title);
+        const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo };
+        Library.add({ srcPath: p, data: res.data, title, meta });
+        if (!loadedFirst) {
+          loadedFirst = true;
+          this.loadSong(res.data, name); /* 第一首新曲直接载入播放器 */
+        }
+      }
+      if (skipped.length) this.log(`已跳过曲库中已有的同名曲目：${skipped.join('、')}`, 'warn');
+      if (added.length > 1) this.log(`批量导入完成：新增 ${added.length} 首入库，当前加载「${added[0]}」`, 'info');
+      else if (added.length === 1) this.log(`已导入「${added[0]}」`, 'info');
+      else if (!skipped.length) this.log('没有可导入的文件', 'warn');
     },
 
     /* 导入成功后存入曲库（复制源文件） */

@@ -250,7 +250,9 @@ const Perf = {
 
   buildGuitarSchedule(st, speed) {
     /* 吉他演奏模式：音域 52–87，键位映射走吉他 Keyboard ROWS */
-    const res = MidiPlayer._buildQueue(MidiPlayer.song, st, { min: 52, max: 87 });
+    const MIN = (typeof Keyboard !== 'undefined') ? Keyboard.min : 52;
+    const MAX = (typeof Keyboard !== 'undefined') ? Keyboard.max : 87;
+    const res = MidiPlayer._buildQueue(MidiPlayer.song, st, { min: MIN, max: MAX });
     const evs = res.events.map((e) => ({ ...e, t: e.t / speed }));
     evs.sort((a, b) => a.t - b.t);
     const chords = [], visual = [];
@@ -259,17 +261,21 @@ const Perf = {
       const base = evs[i].t;
       let j = i;
       while (j < evs.length && evs[j].t - base <= 0.005) { j++; }
-      const seen = new Set(), keys = [], pitches = [];
+      const seen = new Set(), keys = [], pitches = [], durs = [];
       for (let k = i; k < j; k++) {
+        /* 硬性 36 音域约束：任何映射结果落在键盘之外的一律不弹不显 */
+        if (evs[k].midi < MIN || evs[k].midi > MAX) continue;
         if (seen.has(evs[k].midi)) continue;
         seen.add(evs[k].midi);
         const hint = midiKeyHint(evs[k].midi);
         if (hint === '?') continue;
         keys.push(hint === '⏎' ? 'enter' : hint.toLowerCase());
         pitches.push(evs[k].midi + 12); /* 游戏音高约定（=模拟器 midi+12），onEvent 以 p-12 还原琴键 */
+        durs.push(Math.round(Math.max(0.08, evs[k].dur / speed) * 1000)); /* 按音符时长保持 */
         visual.push({ ...evs[k], dur: evs[k].dur / speed });
       }
-      chords.push({ t: base * 1000, keys, pitches });
+      if (!keys.length) { i = j; continue; } /* 整和弦不可弹 → 跳过 */
+      chords.push({ t: base * 1000, keys, pitches, durs });
       i = j;
     }
     return { chords, visual, stats: res.stats, trackLabel: res.trackLabel,
@@ -289,6 +295,7 @@ const Perf = {
     this.activeTrackLabel = sched.trackLabel;
     this.melodyTrack = sched.melodyTrack;
     this.song = MidiPlayer.song;
+    this._builtFor = Keyboard.instrument; /* 记录构建时乐器，play 前检测陈旧调度 */
     UI.refreshTransport();
   },
 
@@ -306,7 +313,9 @@ const Perf = {
       this.showAdminModal();
       return;
     }
-    if (!this.chords || !this.chords.length) this.rebuild();
+    /* 乐器切换后（切换时 Perf 已停止 → 未重建）旧和弦仍是上一件乐器的键位映射，
+     * 直接播放会把"域外音"打进游戏——构建乐器不符必须重建 */
+    if (!this.chords || !this.chords.length || this._builtFor !== Keyboard.instrument) this.rebuild();
     /* 曲末再按播放 → 从头开始 */
     if (this.songTimeNow() >= this.duration - 0.01) {
       this._dispT = 0;
@@ -484,7 +493,10 @@ const Perf = {
     /* 纪元不符 = 旧会话的迟到事件：一律丢弃（含 ended——用户停止时已自置状态） */
     if (data.sid != null && data.sid !== this.sid) return;
     if (kind === 'note') {
-      const hold = Math.max(120, (data.holdMs || 8) + 60);
+      /* 琴键高亮与游戏内真实保持时长同步（worker 回传 durMs；旧会话回退 holdMs） */
+      const hold = data.durMs != null
+        ? Math.min(15000, Math.max(150, data.durMs))
+        : Math.max(120, (data.holdMs || 8) + 60);
       const names = [];
       for (const p of data.pitches) {
         const lane = p - 12; // 游戏音高 → 模拟器音域

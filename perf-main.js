@@ -30,13 +30,13 @@ function ensureWorker() {
       return;
     }
     if (m.type === 'resumed') {
-      if (pendingResume) { pendingResume({ ok: true, t: m.t }); pendingResume = null; }
+      if (pendingResume) { pendingResume({ ok: m.ok !== false, error: m.error, t: m.t }); pendingResume = null; }
       return;
     }
     const win = getWin && getWin();
     if (!win) return;
     if (m.type === 'note') {
-      win.webContents.send('perf-note', { idx: m.idx, pitches: m.pitches, holdMs: m.holdMs, sid: m.sid });
+      win.webContents.send('perf-note', { idx: m.idx, pitches: m.pitches, holdMs: m.holdMs, durMs: m.durMs, sid: m.sid });
     } else if (m.type === 'progress') {
       win.webContents.send('perf-progress', { t: m.t, idx: m.idx, total: m.total, sid: m.sid });
     } else if (m.type === 'ended') {

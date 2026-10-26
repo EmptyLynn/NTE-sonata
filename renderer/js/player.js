@@ -61,8 +61,10 @@ const MidiPlayer = {
   },
 
   _buildQueue(song, st, target) {
-    const min = target ? target.min : 48;
-    const max = target ? target.max : 83;
+    /* 默认目标音域跟随当前乐器（吉他 52–87 / 钢琴 48–83）：
+     * 否则吉他模式下教学/练习队列仍按钢琴域折叠，域外音无键可按 → 教学卡住 */
+    const min = target ? target.min : (typeof Keyboard !== 'undefined' ? Keyboard.min : 48);
+    const max = target ? target.max : (typeof Keyboard !== 'undefined' ? Keyboard.max : 83);
     const center = (min + max) / 2;
     /* --- 选轨 --- */
     let idxs = [];
@@ -336,15 +338,17 @@ function buildPerfSchedule(song, st, speed) {
     const seen = new Set();
     const keys = [];
     const pitches = [];
+    const durs = [];
     for (const ev of group) {
       if (seen.has(ev.midi)) continue; // 同和弦重复音去重
       seen.add(ev.midi);
       const gameMidi = ev.midi + 12; // 模拟器音域(48–83) → 游戏键位(60–95)，同一物理键
       keys.push(GAME_KEY_MAP[gameMidi]);
       pitches.push(gameMidi);
+      durs.push(Math.round(Math.max(0.08, ev.dur / speed) * 1000)); // 演奏模式按音符时长保持
       visual.push({ ...ev, dur: ev.dur / speed }); // midi 保持 48–83，与练习模式同源
     }
-    chords.push({ t: base * 1000, keys, pitches });
+    chords.push({ t: base * 1000, keys, pitches, durs });
     i = j;
   }
   return {
