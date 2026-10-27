@@ -1,0 +1,12 @@
+const fs = require('fs');
+const path = require('path');
+const asarPath = path.join(process.env.LOCALAPPDATA, 'Programs', 'YihuanInstrument', 'resources', 'app.asar');
+const buf = fs.readFileSync(asarPath);
+const s = buf.toString('latin1');
+const lines = [];
+lines.push('asar mtime 验证 + 内容检查：');
+lines.push('钢琴短击修复(应为 true):', !/pitches\.push\(gameMidi\);[\s\S]{0,200}durs\.push/.test(s));
+lines.push('模糊修复(应为 true):', s.includes('画布必须按缩放后的可视尺寸重建') || /Viz\._resize\(\);\s*\n\s*Viz\._resizeEcho\(\);/.test(s));
+lines.push('b站署名(应为 true):', s.includes('b站 @林羽empty'));
+lines.push('设置面板(应为 true):', s.includes('settings-modal'));
+fs.writeFileSync('D:\\JOY\\异环钢琴模拟器Zcode\\install-verify.txt', lines.join('\n'), 'utf8');

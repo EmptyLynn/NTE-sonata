@@ -1,0 +1,9 @@
+asar mtime 验证 + 内容检查：
+钢琴短击修复(应为 true):
+true
+模糊修复(应为 true):
+true
+b站署名(应为 true):
+false
+设置面板(应为 true):
+true

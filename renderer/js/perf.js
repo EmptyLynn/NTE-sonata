@@ -501,6 +501,9 @@ const Perf = {
       for (const p of data.pitches) {
         const lane = p - 12; // 游戏音高 → 模拟器音域
         names.push(midiToName(p));
+        /* 重击语义：保持中的同键先松开再按下——快速重复音也能各自产生
+         * 新的回声条与涟漪（否则 0→1 判定吞掉后按的音符条） */
+        Keyboard.release(lane, 'play');
         Keyboard.press(lane, 'play');
         setTimeout(() => Keyboard.release(lane, 'play'), hold);
       }
