@@ -498,6 +498,14 @@
       const appEl = document.getElementById('app');
       if (!appEl) return;
       const apply = () => {
+        /* 手机宽度走真·移动端布局（CSS 重排），等比缩放只服务桌面小窗 */
+        if (window.matchMedia('(max-width: 560px)').matches) {
+          appEl.style.transform = '';
+          appEl.style.marginBottom = '';
+          Viz._resize();
+          Viz._resizeEcho();
+          return;
+        }
         const naturalW = appEl.scrollWidth;
         const naturalH = appEl.scrollHeight;
         const availW = window.innerWidth - 12;
