@@ -235,6 +235,8 @@ const Perf = {
       else if (this.hwnd) text = `目标窗口：${this.windowTitle || this.els.winSel.selectedOptions[0]?.textContent || this.hwnd}`;
       else text = '未选择目标窗口';
       text += this.mode === 'bg' ? ' · 后台注入' : ' · 前台模拟';
+      /* 乐器 + 按法一目了然：钢琴=短击，吉他=延音（防误判当前按法） */
+      text += Keyboard.instrument === 'guitar' ? ' · 🎸 吉他：延音按法' : ' · 🎹 钢琴：短击';
     }
     this.els.status.textContent = text;
   },

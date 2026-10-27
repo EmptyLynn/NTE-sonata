@@ -456,6 +456,7 @@ body.no-hints .key .hint { opacity: 0; }
 .app-footer .footer-brand { font-weight: 600; color: rgba(35, 38, 47, 0.55); }
 .app-footer .footer-sep { opacity: .5; }
 .app-footer b { font-weight: 650; color: rgba(var(--accent-rgb), 0.75); }
+.app-footer .footer-ver { font-variant-numeric: tabular-nums; color: rgba(35, 38, 47, 0.34); }
 .bottom-head {
   display: flex; align-items: center; gap: 14px;
   padding: 2px 6px 9px;

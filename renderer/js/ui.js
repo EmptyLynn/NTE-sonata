@@ -94,7 +94,7 @@
         });
       }
 
-      this.log('欢迎使用异环乐器模拟器（b站 @林羽empty）—— 按 Z~M / A~J / Q~U 演奏，Shift 高半音，Ctrl 低半音', 'info');
+      this.log('欢迎使用异环乐器模拟器 v1.1.1（b站 @林羽empty）—— 当前乐器：' + (Keyboard.instrument === 'guitar' ? '🎸 吉他' : '🎹 钢琴') + '，按 Z~M / A~J / Q~U 演奏', 'info');
       this.log('选择本地 MIDI 后即可自动演奏；F8 播放/暂停、F9 停止（失焦可用）', 'info');
     },
 
