@@ -26,6 +26,7 @@ const Perf = {
   /* 显示时钟：worker 是位置的唯一权威，每 ~100ms 报告一次（盖纪元章）；
    * 渲染层在两次报告之间线性外推（抖动 ≤30ms 不可见），不做人漂移校正 */
   _dispT: 0,             // worker 最近报告的真实时间位置（秒）
+  _noteTimers: new Map(), // UI 按键释放定时器（lane → timers）：重击时作废旧定时器防提前松键
   _dispAt: 0,            // 该位置对应的本机时刻（performance.now()）
   _sidSeq: 0,            // 纪元计数器：play/seek 都会递增
   sid: 0,                // 当前纪元：worker 事件盖章比对，不符即弃
@@ -228,6 +229,25 @@ const Perf = {
     return false;
   },
 
+  /* 重击语义：作废旧释放定时器 + 清空 play 计数 → 松开旧条 → 按出新条。
+   * 保证快速重复音每次击打都有独立回声条，且叠加的旧定时器不会提前松键 */
+  strikeLane(lane, hold) {
+    const pending = this._noteTimers.get(lane);
+    if (pending) {
+      for (const t of pending) clearTimeout(t);
+      this._noteTimers.delete(lane);
+    }
+    const tags = Keyboard.counts.get(lane);
+    if (tags && tags.has('play')) {
+      while (Keyboard.counts.get(lane) && Keyboard.counts.get(lane).has('play')) Keyboard.release(lane, 'play');
+    }
+    Keyboard.press(lane, 'play');
+    const tid = setTimeout(() => {
+      Keyboard.release(lane, 'play');
+      this._noteTimers.delete(lane);
+    }, hold);
+    this._noteTimers.set(lane, [tid]);
+  },
   updateStatus(msgOverride) {
     let text = msgOverride;
     if (!text) {
@@ -403,6 +423,8 @@ const Perf = {
     this._dispT = 0;
     this._dispAt = performance.now();
     this._lastProgT = 0;
+    this._noteTimers.forEach((ts) => ts.forEach((t) => clearTimeout(t)));
+    this._noteTimers.clear();
     Keyboard.releaseAll('play');
     if (was !== 'stopped') {
       UI.refreshTransport();
@@ -505,9 +527,7 @@ const Perf = {
         names.push(midiToName(p));
         /* 重击语义：保持中的同键先松开再按下——快速重复音也能各自产生
          * 新的回声条与涟漪（否则 0→1 判定吞掉后按的音符条） */
-        Keyboard.release(lane, 'play');
-        Keyboard.press(lane, 'play');
-        setTimeout(() => Keyboard.release(lane, 'play'), hold);
+        this.strikeLane(lane, hold);
       }
       const pn = document.getElementById('progress-note');
       if (pn) pn.textContent = names.join('+');
