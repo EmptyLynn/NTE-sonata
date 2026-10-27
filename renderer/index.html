@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>异环乐器模拟器</title>
+  <link rel="stylesheet" href="css/style.css?v1.1.0-8av2qg">
+<style>
+  /* 网页版：演奏模式依赖 Win32 按键注入，仅桌面版提供 */
+  #mode-perf, #perf-panel { display: none !important; }
+  /* F8/F9 为桌面版全局热键，网页版无效 */
+  .web-hide { display: none !important; }
+  .web-badge {
+    position: fixed; right: 14px; bottom: 10px; z-index: 9;
+    font-size: 11px; letter-spacing: .04em;
+    color: rgba(35,38,47,.4); pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div id="app">
+
+    <!-- ═══════════ 顶栏 ═══════════ -->
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-logo" viewBox="0 0 36 36" aria-hidden="true">
+          <rect x="2" y="2" width="32" height="32" rx="9" fill="url(#lg)" />
+          <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#2c3040"/><stop offset="1" stop-color="#171a24"/>
+          </linearGradient></defs>
+          <rect x="7" y="8" width="4.2" height="13" rx="1.4" fill="#f4f5f9"/>
+          <rect x="12.9" y="8" width="4.2" height="13" rx="1.4" fill="#f4f5f9"/>
+          <rect x="18.8" y="8" width="4.2" height="13" rx="1.4" fill="#f4f5f9"/>
+          <rect x="24.7" y="8" width="4.2" height="13" rx="1.4" fill="#f4f5f9"/>
+          <rect x="10" y="8" width="3.6" height="8" rx="1.2" fill="#171a24"/>
+          <rect x="16" y="8" width="3.6" height="8" rx="1.2" fill="#171a24"/>
+          <rect x="21.9" y="8" width="3.6" height="8" rx="1.2" fill="#171a24"/>
+          <circle cx="13" cy="27" r="2.1" fill="#e9576e"/>
+          <circle cx="19" cy="27" r="2.1" fill="#f4f5f9" opacity=".85"/>
+          <circle cx="25" cy="27" r="2.1" fill="#f4f5f9" opacity=".85"/>
+        </svg>
+        <div class="brand-text">
+          <h1>异环乐器模拟器</h1>
+          <span class="brand-sub">YIHUAN&nbsp;INSTRUMENT&nbsp;SIMULATOR&nbsp;·&nbsp;by&nbsp;b站&nbsp;@林羽empty</span>
+        </div>
+      </div>
+      <div class="hotkey-hints">
+        <button id="btn-tour" class="btn btn-ghost" title="新手引导（重新观看讲解）">? 教程</button>
+        <button id="btn-settings" class="btn btn-ghost" title="个性化设置（主题色 / 回声条 / 粒子）">⚙ 设置</button>
+        <span class="hint-chip"><kbd>Shift</kbd><em>高半音</em></span>
+        <span class="hint-chip"><kbd>Ctrl</kbd><em>低半音</em></span>
+        <span class="hint-chip web-hide"><kbd>F8</kbd><em>播放/暂停</em></span>
+        <span class="hint-chip web-hide"><kbd>F9</kbd><em>停止</em></span>
+      </div>
+    </header>
+
+    <main>
+
+      <!-- ═══════════ MIDI 播放控制面板 ═══════════ -->
+      <section class="panel player-panel">
+        <div class="mode-row">
+          <div class="seg" id="mode-seg" role="tablist" title="练习模式=模拟器发声；演奏模式=向游戏窗口发送按键">
+            <button id="mode-practice" class="seg-btn active">🎹 练习</button>
+            <button id="mode-perf" class="seg-btn">🎸 演奏</button>
+          </div>
+          <div class="seg" id="instr-seg" role="tablist" title="切换乐器">
+            <button id="instr-piano" class="seg-btn active">🎹 钢琴</button>
+            <button id="instr-guitar" class="seg-btn">🎸 吉他</button>
+          </div>
+          <div id="perf-status" class="perf-status"></div>
+        </div>
+
+        <div class="file-row">
+          <button id="btn-pick" class="btn btn-primary" title="选择本地 MIDI 文件">
+            <svg viewBox="0 0 16 16" class="ic"><path d="M8 11V3.7L5.8 5.9 4.9 5 8 1.9 11.1 5l-.9.9L8 3.7V11zM3 12h10v1.5H3z" fill="currentColor" transform="translate(0 -1)"/></svg>
+            选择 MIDI
+          </button>
+          <button id="btn-library" class="btn" title="打开曲库（收藏夹）">
+            <svg viewBox="0 0 16 16" class="ic"><path d="M3 2.5h1.6v11H3zM5.8 2.5h1.6v11H5.8zM9 2.6l1.5-.4 2.6 10.8-1.5.4z" fill="currentColor"/></svg>
+            曲库
+            <span id="lib-badge" class="badge hidden">0</span>
+          </button>
+          <div class="song-info">
+            <div id="song-name" class="song-name">未加载乐谱</div>
+            <div id="song-meta" class="song-meta">支持 .mid / .midi / .rmi（自动剥离 RIFF 封装）· 导入即存入曲库</div>
+          </div>
+        </div>
+
+        <div class="transport-row">
+          <button id="btn-play"  class="btn btn-round" disabled title="播放（F8）">
+            <svg viewBox="0 0 16 16" class="ic"><path d="M4.5 2.8v10.4L13 8z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-pause" class="btn btn-round" disabled title="暂停（F8）">
+            <svg viewBox="0 0 16 16" class="ic"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-stop"  class="btn btn-round" disabled title="停止（F9）">
+            <svg viewBox="0 0 16 16" class="ic"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5" fill="currentColor"/></svg>
+          </button>
+          <div class="progress-wrap">
+            <input id="progress" type="range" min="0" max="1000" value="0" disabled>
+            <div class="progress-times">
+              <span id="time-cur">0:00</span>
+              <span id="progress-note" class="progress-note"></span>
+              <span id="time-total">0:00</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <label class="ctl">
+            <span class="ctl-name">速度</span>
+            <input id="speed" type="range" min="0.25" max="3" step="0.05" value="1">
+            <span id="speed-val" class="ctl-val">1.00×</span>
+          </label>
+          <label class="ctl">
+            <span class="ctl-name">转调</span>
+            <span class="stepper">
+              <button id="tr-minus" class="step-btn">−</button>
+              <span id="tr-val" class="ctl-val">0</span>
+              <button id="tr-plus" class="step-btn">＋</button>
+            </span>
+          </label>
+          <label class="ctl">
+            <span class="ctl-name">轨道</span>
+            <span class="sel-wrap">
+              <select id="track-sel">
+                <option value="all" selected>全部轨道</option>
+                <option value="melody">主旋律（自动）</option>
+                <option value="custom">自定义索引</option>
+              </select>
+              <input id="track-custom" class="hidden" placeholder="如 0,2" spellcheck="false">
+            </span>
+          </label>
+          <label class="ctl">
+            <span class="ctl-name">超域</span>
+            <span class="sel-wrap">
+              <select id="range-mode" title="超出 48–83 音域的处理方式">
+                <option value="fold">八度折叠 fold</option>
+                <option value="shift">最优移调 shift</option>
+                <option value="cut">直接截断 cut</option>
+              </select>
+            </span>
+          </label>
+          <label class="ctl ctl-audio" title="跟弹教学：琴键静音，按指示演奏，按对变绿">
+            <span class="ctl-name">教学</span>
+            <span class="sel-wrap">
+              <select id="teach-sel">
+                <option value="off" selected>关闭</option>
+                <option value="wait">跟弹 · 等待</option>
+                <option value="flow">跟弹 · 同步</option>
+              </select>
+            </span>
+          </label>
+          <button id="btn-export-chart" class="btn btn-export" title="按当前设置将整曲按键导出为 txt 键盘谱">⌨ 导出键盘谱</button>
+          <label class="ctl ctl-audio">
+            <span class="ctl-name">音色</span>
+            <span class="sel-wrap">
+              <select id="inst-sel"><option value="">加载中…</option></select>
+            </span>
+          </label>
+          <label class="ctl ctl-audio">
+            <span class="ctl-name">音量</span>
+            <input id="volume" type="range" min="0" max="1" step="0.01" value="0.85">
+          </label>
+          <label class="ctl ctl-audio" title="松开琴键后声音延续的时长（手动演奏）">
+            <span class="ctl-name">延音</span>
+            <input id="sustain" type="range" min="0" max="5000" step="100" value="800">
+            <span id="sustain-val" class="ctl-val">800ms</span>
+          </label>
+        </div>
+
+        <!-- ═══════════ 演奏模式专属面板 ═══════════ -->
+        <div id="perf-panel" class="perf-panel hidden">
+          <div class="perf-row">
+            <label class="ctl">
+              <span class="ctl-name">目标窗口</span>
+              <span class="sel-wrap">
+                <select id="perf-window" title="接收按键的窗口（游戏需已启动）"></select>
+                <button id="perf-refresh" class="step-btn" title="刷新窗口列表">⟳</button>
+                <button id="perf-auto" class="btn btn-ghost" title="自动检测异环/NTE 窗口">自动检测</button>
+              </span>
+            </label>
+            <label class="ctl">
+              <span class="ctl-name">输入方式</span>
+              <span class="sel-wrap">
+                <select id="perf-input-mode" title="后台注入=游戏无需前台（推荐）；前台模拟=真实键盘输入">
+                  <option value="bg">后台注入（推荐）</option>
+                  <option value="fg">前台模拟</option>
+                </select>
+              </span>
+            </label>
+            <label class="ctl" title="每个按键按住的毫秒数（过长可能丢音，过短可能不触发）">
+              <span class="ctl-name">按键时长</span>
+              <input id="perf-hold" type="number" min="2" max="120" step="1" value="35" style="width:58px">
+              <span class="ctl-val">ms</span>
+            </label>
+            <label class="ctl" title="点击演奏后延迟多少秒开始发送（前台模式留时间切到游戏）">
+              <span class="ctl-name">倒计时</span>
+              <span class="sel-wrap">
+                <select id="perf-countdown">
+                  <option value="0">无</option>
+                  <option value="1">1 秒</option>
+                  <option value="3" selected>3 秒</option>
+                  <option value="5">5 秒</option>
+                </select>
+              </span>
+            </label>
+            <button id="perf-test" class="btn" title="向目标窗口发送 C-E-G 测试和弦">测试按键</button>
+            <button id="perf-diagnose" class="btn btn-ghost" title="检查目标窗口状态与按键投递是否正常">诊断</button>
+            <span id="perf-admin-chip" class="admin-chip">权限：检测中…</span>
+            <button id="perf-admin" class="btn hidden" title="游戏以管理员运行时，普通权限的按键会被 Windows 拦截（UIPI）">以管理员重启</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ 三排虚拟琴键 ═══════════ -->
+      <section class="keyboard-zone">
+        <div class="kbd-toolbar">
+          <span class="kbd-range">音域 <b>C3 – B5</b>（MIDI 48 – 83）· 每排 12 音：1 #1 2 ♭3 3 4 #4 5 #5 6 ♭7 7</span>
+          <button id="btn-hints" class="btn btn-ghost">隐藏键位提示</button>
+        </div>
+        <div id="keyboard" class="keyboard" aria-label="虚拟钢琴键盘"></div>
+      </section>
+
+      <!-- ═══════════ 底部：瀑布流可视化 / 实时日志 ═══════════ -->
+      <section class="panel bottom-panel">
+        <div class="bottom-head">
+          <div class="seg" role="tablist">
+            <button id="tab-viz" class="seg-btn active">瀑布流</button>
+            <button id="tab-echo" class="seg-btn">回声</button>
+            <button id="tab-log" class="seg-btn">实时日志</button>
+          </div>
+          <div id="stats" class="stats">—</div>
+          <button id="btn-clear-log" class="btn btn-ghost">清空日志</button>
+        </div>
+        <div id="viz-wrap" class="viz-wrap">
+          <canvas id="viz"></canvas>
+        </div>
+        <div id="echo-wrap" class="viz-wrap hidden">
+          <canvas id="echo-viz"></canvas>
+        </div>
+        <ul id="log" class="log hidden"></ul>
+      </section>
+
+    </main>
+
+    <footer class="app-footer">
+      <span class="footer-brand">异环乐器模拟器</span>
+      <span class="footer-sep">·</span>
+      <span>设计与开发 <b>b站 @林羽empty</b></span><span class="footer-sep">·</span><span class="footer-ver">v1.1.1</span>
+    </footer>
+  </div>
+
+  <!-- 浏览器模式（无 Electron）的文件选择兜底 -->
+  <input type="file" id="file-input" accept=".mid,.midi,.rmi" class="hidden">
+
+  <!-- ═══════════ 曲库弹窗 ═══════════ -->
+  <div id="lib-modal" class="lib-modal hidden">
+    <div class="lib-backdrop"></div>
+    <div class="lib-dialog">
+      <header class="lib-head">
+        <h2>曲库 <span id="lib-count" class="lib-count">0 首</span></h2>
+        <div class="lib-head-actions">
+          <button id="lib-import" class="btn btn-primary">导入 MIDI</button>
+          <button id="lib-close" class="btn btn-ghost" title="关闭 (Esc)">✕ 关闭</button>
+        </div>
+      </header>
+      <div class="lib-toolbar">
+        <div id="lib-chips" class="lib-chips"></div>
+        <div class="lib-tools">
+          <div class="seg">
+            <button id="lib-view-grid" class="seg-btn active" title="网格布局">▦</button>
+            <button id="lib-view-list" class="seg-btn" title="列表布局">☰</button>
+          </div>
+          <select id="lib-sort" title="排序">
+            <option value="recent">最近导入</option>
+            <option value="name">名称</option>
+            <option value="duration">时长</option>
+            <option value="notes">音符数</option>
+          </select>
+        </div>
+      </div>
+      <div id="lib-grid" class="lib-grid"></div>
+      <div id="lib-empty" class="lib-empty hidden">
+        <div class="lib-empty-icon">♪</div>
+        <p>曲库还是空的</p>
+        <p class="dim">通过「选择 MIDI」或「导入 MIDI」加入的乐曲会复制一份保存在这里，<br>即使原文件被删除或移动也不受影响。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ 后台注入需管理员提示弹窗 ═══════════ -->
+  <div id="admin-modal" class="lib-modal hidden">
+    <div class="lib-backdrop"></div>
+    <div class="countdown-dialog" style="max-width: 460px;">
+      <div class="countdown-num" style="font-size:40px;">⛔</div>
+      <div class="countdown-text">
+        <b>后台注入需要管理员权限</b><br>
+        游戏以管理员运行时，Windows 会拦截普通权限进程发送的按键（UIPI）。<br>
+        <span class="dim">提权重启后设置与曲库都会保留。</span>
+      </div>
+      <div class="tour-btns">
+        <button id="admin-cancel" class="btn">取消</button>
+        <button id="admin-fg" class="btn">改用前台模式</button>
+        <button id="admin-elevate" class="btn btn-primary">以管理员重启</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ 前台模式倒计时弹窗 ═══════════ -->
+  <div id="countdown-modal" class="lib-modal hidden">
+    <div class="lib-backdrop"></div>
+    <div class="countdown-dialog">
+      <div id="countdown-num" class="countdown-num">3</div>
+      <div id="countdown-text" class="countdown-text"></div>
+      <button id="countdown-cancel" class="btn">取消演奏</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ 个性化设置弹窗 ═══════════ -->
+  <div id="settings-modal" class="lib-modal hidden">
+    <div class="lib-backdrop" id="settings-backdrop"></div>
+    <div class="lib-dialog settings-dialog">
+      <header class="lib-head">
+        <h2>⚙ 个性化设置</h2>
+        <div class="lib-head-actions">
+          <button id="settings-close" class="btn btn-ghost" title="关闭 (Esc)">✕ 关闭</button>
+        </div>
+      </header>
+
+      <!-- 回声条 -->
+      <section class="set-section">
+        <h3 class="set-title">回声条</h3>
+        <div class="set-row">
+          <span class="set-label">色彩</span>
+          <div class="swatch-row" id="echo-swatches">
+            <button class="swatch" data-echo="#39b98c" style="background:#39b98c" title="翠绿（默认）"></button>
+            <button class="swatch" data-echo="#e9576e" style="background:#e9576e" title="玫瑰"></button>
+            <button class="swatch" data-echo="#4f7cf0" style="background:#4f7cf0" title="海洋蓝"></button>
+            <button class="swatch" data-echo="#9b6ef3" style="background:#9b6ef3" title="星紫"></button>
+            <button class="swatch" data-echo="#f0a635" style="background:#f0a635" title="暖橙"></button>
+            <label class="swatch swatch-custom" title="自定义颜色">
+              <input type="color" id="echo-custom" value="#39b98c">
+              <span>＋</span>
+            </label>
+            <button class="swatch swatch-rainbow" data-echo="rainbow" title="炫彩：色相随时间流转，低音暖高音冷"></button>
+          </div>
+        </div>
+        <p class="set-hint">弹奏 / 自动播放时，回声条按所选色彩上升；炫彩模式每颗音符都有自己的颜色。</p>
+      </section>
+
+      <!-- 主题色 -->
+      <section class="set-section">
+        <h3 class="set-title">主题色</h3>
+        <div class="set-row">
+          <span class="set-label">点缀色</span>
+          <div class="swatch-row" id="theme-swatches">
+            <button class="swatch" data-theme="#e9576e" style="background:#e9576e" title="玫瑰（默认）"></button>
+            <button class="swatch" data-theme="#4f7cf0" style="background:#4f7cf0" title="海洋蓝"></button>
+            <button class="swatch" data-theme="#9b6ef3" style="background:#9b6ef3" title="星紫"></button>
+            <button class="swatch" data-theme="#39b98c" style="background:#39b98c" title="翠绿"></button>
+            <button class="swatch" data-theme="#f0a635" style="background:#f0a635" title="暖橙"></button>
+            <button class="swatch" data-theme="#38b6c9" style="background:#38b6c9" title="青碧"></button>
+          </div>
+        </div>
+        <p class="set-hint">按钮、滑杆、主旋律音符与判定线会一并换色。</p>
+      </section>
+
+      <!-- 视觉效果 -->
+      <section class="set-section">
+        <h3 class="set-title">视觉效果</h3>
+        <div class="set-row">
+          <span class="set-label">粒子反馈</span>
+          <button id="set-particles" class="switch on" role="switch" aria-checked="true" title="音符触底时迸发粒子"><i></i></button>
+        </div>
+        <p class="set-hint">关闭后音符触底不再迸发粒子（低配机器更流畅）。</p>
+      </section>
+
+      <!-- 关于 -->
+      <section class="set-section set-about">
+        <h3 class="set-title">关于</h3>
+        <div class="link-cards">
+          <a class="link-card" href="https://space.bilibili.com/" target="_blank" rel="noopener" id="link-bilibili">
+            <span class="link-ic bilibili"></span>
+            <span class="link-txt"><b>B站主页</b><em>@林羽empty</em></span>
+            <span class="link-arrow">→</span>
+          </a>
+          <a class="link-card" href="https://github.com/EmptyLynn" target="_blank" rel="noopener" id="link-github">
+            <span class="link-ic github"></span>
+            <span class="link-txt"><b>GitHub</b><em>@EmptyLynn</em></span>
+            <span class="link-arrow">→</span>
+          </a>
+        </div>
+        <p class="set-sig">异环乐器模拟器 · 设计与开发 <b>b站 @林羽empty</b></p>
+      </section>
+    </div>
+  </div>
+
+  <!-- 分类编辑弹层 -->
+  <div id="lib-cat-pop" class="lib-cat-pop hidden">
+    <div class="lib-pop-title">设置分类（逗号分隔，最多 3 个）</div>
+    <input placeholder="如：收藏, 演出" spellcheck="false">
+    <div class="lib-pop-quick"></div>
+    <div class="lib-pop-row">
+      <button class="lib-pop-ok btn btn-primary">确定</button>
+      <button class="lib-pop-cancel btn">取消</button>
+    </div>
+  </div>
+
+  <script src="vendor/midi.js?v1.1.0-8av2qg"></script>
+  <script src="js/audio.js?v1.1.0-8av2qg"></script>
+  <script src="js/keyboard.js?v1.1.0-8av2qg"></script>
+  <script src="js/midi.js?v1.1.0-8av2qg"></script>
+  <script src="js/player.js?v1.1.0-8av2qg"></script>
+  <script src="js/visualizer.js?v1.1.0-8av2qg"></script>
+  <script src="js/library.js?v1.1.0-8av2qg"></script>
+  <script src="js/teaching.js?v1.1.0-8av2qg"></script>
+  <script src="js/perf.js?v1.1.0-8av2qg"></script>
+  <script src="js/tour.js?v1.1.0-8av2qg"></script>
+  <script src="js/ui.js?v1.1.0-8av2qg"></script>
+<span class="web-badge">网页版 · 仅练习模式 · b站 @林羽empty</span>
+</body>
+</html>
