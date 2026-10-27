@@ -513,6 +513,10 @@
           appEl.style.transform = '';
           appEl.style.marginBottom = '';
         }
+        /* transform 改变视觉尺寸但布局盒不变，ResizeObserver 不触发；
+         * 画布必须按缩放后的可视尺寸重建 backing store，否则被整体拉伸变模糊 */
+        Viz._resize();
+        Viz._resizeEcho();
       };
       window.addEventListener('resize', apply);
       if (window.ResizeObserver) new ResizeObserver(apply).observe(appEl);

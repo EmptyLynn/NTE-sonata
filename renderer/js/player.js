@@ -338,17 +338,17 @@ function buildPerfSchedule(song, st, speed) {
     const seen = new Set();
     const keys = [];
     const pitches = [];
-    const durs = [];
+    /* 钢琴不携带 durs（短击模式）：持续保持会长时间占用 Shift/Ctrl 修饰键，
+     * 导致演奏中其他带修饰键的音错音；吉他模式（buildGuitarSchedule）保留长按 */
     for (const ev of group) {
       if (seen.has(ev.midi)) continue; // 同和弦重复音去重
       seen.add(ev.midi);
       const gameMidi = ev.midi + 12; // 模拟器音域(48–83) → 游戏键位(60–95)，同一物理键
       keys.push(GAME_KEY_MAP[gameMidi]);
       pitches.push(gameMidi);
-      durs.push(Math.round(Math.max(0.08, ev.dur / speed) * 1000)); // 演奏模式按音符时长保持
       visual.push({ ...ev, dur: ev.dur / speed }); // midi 保持 48–83，与练习模式同源
     }
-    chords.push({ t: base * 1000, keys, pitches, durs });
+    chords.push({ t: base * 1000, keys, pitches });
     i = j;
   }
   return {
