@@ -65,19 +65,11 @@ html = html.replace(/(src="(js|vendor)\/[^"]+)"/g, `$1?${VER}"`);
 html = html.replace(/(href="css\/[^"]+)"/g, `$1?${VER}"`);
 fs.writeFileSync(indexPath, html);
 
-/* 教程适配：不自动弹出（首步提及演奏模式/F8/F9 为桌面专属，顶栏「?」仍可手动查看） */
+/* 教程适配：首次进入自动弹出；桌面专属文案替换为网页版说法（顶栏「?」可随时重看） */
 const tourPath = path.join(OUT, 'renderer', 'js', 'tour.js');
 let tour = fs.readFileSync(tourPath, 'utf8');
-tour = tour.replace(
-  `  maybeAuto(key) {
-    if (this.done[key]) return false;
-    this.start(key, false);
-    return true;
-  },`,
-  `  maybeAuto(key) {
-    return false; /* 网页版：教程不自动弹出，顶栏「?」可手动查看 */
-  },`,
-);
+/* 首次进入自动弹出教程（完成状态记 localStorage，仅第一次）；桌面专属文案替换为网页版说法 */
+tour = tour.replace("title: '两种模式'", "title: '练习模式'");
 tour = tour.replace(
   '\\n🎮 演奏模式：把按键发给游戏窗口，在《异环》里自动弹琴（切过去会有单独的引导）。',
   '\\n（网页版仅提供练习模式。）',
