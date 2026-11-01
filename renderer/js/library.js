@@ -15,7 +15,11 @@ const Library = {
 
   els: {},
 
+  _initPromise: null,
+
   init() {
+    /* 防重入：主初始化与延迟初始化各调一次，重复绑定事件/并发播种会导致曲库重复 */
+    if (this._initPromise) return this._initPromise;
     this.els = {
       modal: document.getElementById('lib-modal'),
       grid: document.getElementById('lib-grid'),
@@ -55,18 +59,35 @@ const Library = {
       if (e.key === 'Escape' && !this.els.modal.classList.contains('hidden')) this.close();
     });
 
-    return this.refresh().then(() => this.seedBuiltins());
+    this._initPromise = this.refresh().then(() => this.seedBuiltins());
+    return this._initPromise;
   },
 
   /* 首次启动把内置曲目（assets/builtin）入库，打「内置」标签；
-   * 播种仅一次（标记持久化），用户删除后不会重生。 */
+   * 播种仅一次（标记持久化），用户删除后不会重生。
+   * v2 增量批次（lastkiss/绿色）：老用户只补新歌，已删除的旧歌不重生。 */
   async seedBuiltins() {
     const FLAG = 'yihuan.piano.library.seeded';
+    const FLAG2 = 'yihuan.piano.library.seeded.v2';
     try {
-      if (localStorage.getItem(FLAG)) return;
+      const done1 = !!localStorage.getItem(FLAG);
+      const done2 = !!localStorage.getItem(FLAG2);
+      if (done1 && done2) return;
       const resp = await fetch('../assets/builtin/manifest.json');
       if (!resp.ok) return;
-      const songs = await resp.json();
+      let songs = await resp.json();
+      if (done1 && !done2) {
+        songs = songs.filter((s) => s.file === 'lastkiss.mid' || s.file === '绿色.mid');
+        /* v2 迁移：旧版主初始化/延迟初始化各跑一次播种的竞态可能重复入库过同名曲目，顺手清理（保留最早一条） */
+        const seen = new Set();
+        let removed = 0;
+        for (const e of [...this.entries]) {
+          const k = String(e.title).trim().toLowerCase();
+          if (seen.has(k)) { await this.remove(e.id); removed++; }
+          else seen.add(k);
+        }
+        if (removed) await this.refresh();
+      }
       const have = new Set(this.entries.map((e) => e.title));
       const todo = songs.filter((s) => !have.has(s.title));
       for (const s of todo) {
@@ -89,6 +110,7 @@ const Library = {
         }
       }
       localStorage.setItem(FLAG, '1');
+      localStorage.setItem(FLAG2, '1');
       await this.refresh();
       if (todo.length && UI && UI.log) UI.log(`内置曲目已加入曲库：${todo.map((s) => s.title).join('、')}`, 'info');
     } catch { /* 内置曲目缺失不致命 */ }
