@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('yihuan', {
   perfPause: () => ipcRenderer.invoke('perf-pause'),
   perfResume: () => ipcRenderer.invoke('perf-resume'),
   perfStop: () => ipcRenderer.invoke('perf-stop'),
-  perfRebase: (chords, offset) => ipcRenderer.invoke('perf-rebase', { chords, offset }),
+  perfRebase: (chords, offset, endMs) => ipcRenderer.invoke('perf-rebase', { chords, offset, endMs }),
   perfSeek: (offset, sid) => ipcRenderer.invoke('perf-seek', { offset, sid }),
   perfHold: (value) => ipcRenderer.invoke('perf-hold', { value }),
   perfSelfHwnd: () => ipcRenderer.invoke('perf-self-hwnd'),

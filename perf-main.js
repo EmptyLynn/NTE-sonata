@@ -99,7 +99,7 @@ module.exports = {
 
     ipcMain.handle('perf-play', (_e, payload) => {
       try {
-        const { chords, hwnd, mode, holdMs, offset } = payload;
+        const { chords, hwnd, mode, holdMs, offset, endMs } = payload;
         if (!chords || !chords.length) return { ok: false, error: '没有可演奏的音符' };
         if (!Number(hwnd) || !ffi.F.IsWindow(Number(hwnd))) {
           return { ok: false, error: '目标窗口无效（游戏关闭了？）' };
@@ -120,7 +120,7 @@ module.exports = {
             resolve({ ok: false, error: '演奏引擎未响应' });
           }, 500);
           worker.on('message', onStarted);
-          worker.postMessage({ type: 'play', chords, hwnd: Number(hwnd), mode, holdMs, offset, sid });
+          worker.postMessage({ type: 'play', chords, hwnd: Number(hwnd), mode, holdMs, offset, endMs, sid });
         });
       } catch (err) {
         return { ok: false, error: String(err.message || err) };
@@ -206,6 +206,7 @@ module.exports = {
           type: 'rebase',
           chords: payload.chords,
           offsetMs: (payload.offset || 0) * 1000,
+          endMs: payload.endMs != null ? payload.endMs : undefined,
         });
       });
     });

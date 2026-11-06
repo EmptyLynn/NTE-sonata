@@ -145,18 +145,21 @@
         const v = parseFloat(el.speed.value);
         el.speedVal.textContent = v.toFixed(2) + '×';
         this.refreshRangeFill(el.speed);
+        /* 先记旧速度下的歌曲位置：调速应停在"歌里同一处"，进度条不跳 */
+        const prevSongPos = (Perf.active && MidiPlayer.song) ? Perf.songPos() : 0;
         MidiPlayer.setSpeed(v);
         /* 演奏模式：丝滑变速——热重定基替换剩余调度，不断音 */
         if (Perf.active && MidiPlayer.song) {
           const playing = Perf.state === 'playing';
-          const pos = Perf.songPos(); /* 歌曲时间轴位置 */
           Perf.rebuild();
           if (playing && window.yihuan && window.yihuan.perfRebase) {
-            window.yihuan.perfRebase(Perf.chords, pos / MidiPlayer.speed);
-            Perf._dispT = pos / MidiPlayer.speed;
+            window.yihuan.perfRebase(Perf.chords, prevSongPos / v, Math.round(Perf.duration * 1000));
+            Perf._dispT = prevSongPos / v;
             Perf._dispAt = performance.now();
           } else {
-            Perf._dispT = Math.min(Perf._dispT, Perf.duration);
+            /* 停止/暂停态：保持歌曲位置（真实位置 = 歌曲位置 / 新速度） */
+            Perf._dispT = Math.min(prevSongPos / v, Perf.duration);
+            Perf._dispAt = performance.now();
           }
         }
         this.saveSettings();
@@ -384,7 +387,7 @@
         MidiPlayer.rebuild(false);
         Perf.rebuild();
         if (playing && window.yihuan && window.yihuan.perfRebase) {
-          window.yihuan.perfRebase(Perf.chords, pos / MidiPlayer.speed);
+          window.yihuan.perfRebase(Perf.chords, pos / MidiPlayer.speed, Math.round(Perf.duration * 1000));
           Perf._dispT = pos / MidiPlayer.speed;
           Perf._dispAt = performance.now();
         } else {
@@ -974,7 +977,7 @@
           Perf.rebuild();
           if (wasPlaying && window.yihuan && window.yihuan.perfRebase) {
             const pos = Perf.songPos();
-            window.yihuan.perfRebase(Perf.chords, pos / MidiPlayer.speed);
+            window.yihuan.perfRebase(Perf.chords, pos / MidiPlayer.speed, Math.round(Perf.duration * 1000));
             Perf._dispT = pos / MidiPlayer.speed;
             Perf._dispAt = performance.now();
           }

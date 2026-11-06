@@ -315,7 +315,9 @@ const Perf = {
       i = j;
     }
     return { chords, visual, stats: res.stats, trackLabel: res.trackLabel,
-             melodyTrack: res.melodyTrack, duration: res.lastT / speed + 0.5 };
+             melodyTrack: res.melodyTrack,
+             /* 时长含音尾（soundEndT）：进度条走满即歌曲真正结束，收尾等待也以此为准 */
+             duration: Math.max(res.lastT / speed + 0.5, (res.soundEndT || 0) / speed + 0.3) };
   },
 
   rebuild() {
@@ -381,6 +383,7 @@ const Perf = {
       mode: this.mode,
       holdMs: this.instrumentHoldMs(),
       offset: startReal,
+      endMs: Math.round(this.duration * 1000), /* 歌曲总时长（真实时间），worker 收尾等待用 */
       sid,
     });
     if (!r || !r.ok) {

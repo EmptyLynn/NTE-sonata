@@ -28,6 +28,7 @@ const S = {
   lastProgress: 0, fgWarned: false,
   timer: null,
   finishTimer: null,   /* 自然结束后等待尾音收尾的定时器 */
+  durationMs: 0,       /* 歌曲总时长（真实时间 ms），0 = 未知 */
   holds: new Map(),    /* spec -> { timer, vk, mod, endAt } 当前保持中的键 */
   modRefs: new Map(),  /* 'shift'|'ctrl' -> 引用计数 */
 };
@@ -134,6 +135,7 @@ function startPlay(p) {
   S.mode = p.mode === 'fg' ? 'fg' : 'bg';
   S.holdMs = Math.max(2, Math.min(120, p.holdMs | 0 || 35));
   S.offsetMs = Math.max(0, p.offset || 0) * 1000;
+  S.durationMs = Math.max(0, (p.endMs | 0) || 0); /* 歌曲总时长（真实时间），收尾等待用 */
   S.idx = 0;
   S.stop = false; S.paused = false; S.running = true;
   S.lastProgress = 0; S.fgWarned = false;
@@ -196,13 +198,18 @@ function finish() {
   if (S.timer) { clearTimeout(S.timer); S.timer = null; }
   const finished = !S.stop && S.idx >= S.chords.length;
   S.running = false; S.paused = false;
-  if (finished && S.holds.size > 0) {
-    /* 自然结束且仍有延音保持中的键（如曲末长按音）：等它们自然收尾再报结束。
-     * 立刻抬键会把最后的尾音掐断（表现为曲末 2-3 秒被吞、戛然而止）。 */
+  if (finished) {
+    /* 自然结束：等"延音收尾"与"歌曲时间轴走完"两者中更晚的那个再报结束。
+     * 延音关时最后的短击只有 ~25ms，若不等时间轴，进度条会在最后一个音符后
+     * 瞬间跳到头并终止（v1.1.3 只修了延音路径，短击路径依旧瞬跳）。 */
     if (S.finishTimer) clearTimeout(S.finishTimer);
     let waitMs = 0;
     for (const h of S.holds.values()) waitMs = Math.max(waitMs, (h.endAt || 0) - nowMs());
-    waitMs = Math.max(0, Math.min(waitMs + 60, HOLD_MAX_MS));
+    if (S.durationMs > 0) {
+      const remainEnd = (S.anchorMs + S.durationMs - 60) - nowMs();
+      if (remainEnd > waitMs) waitMs = remainEnd;
+    }
+    waitMs = Math.min(Math.max(0, waitMs) + 60, HOLD_MAX_MS); /* 上限 30s：防静音尾声拖住不结束 */
     S.finishTimer = setTimeout(() => {
       S.finishTimer = null;
       releaseAllHolds(); /* 兜底抬键（正常此时已全部自然抬起，防游戏内粘键长鸣） */
@@ -274,6 +281,7 @@ parentPort.on('message', (m) => {
     if (!S.running || S.stop) return;
     S.chords = m.chords || S.chords;
     S.offsetMs = Math.max(0, m.offsetMs || 0);
+    if (m.endMs != null) S.durationMs = Math.max(0, m.endMs | 0); /* 速度变了，歌曲真实总时长同步刷新 */
     S.idx = 0;
     while (S.idx < S.chords.length && S.chords[S.idx].t < S.offsetMs) S.idx++;
     S.anchorMs = nowMs() - S.offsetMs;
