@@ -27,7 +27,8 @@ const S = {
   hwnd: 0, mode: 'bg', holdMs: 8,
   lastProgress: 0, fgWarned: false,
   timer: null,
-  holds: new Map(),    /* spec -> { timer, vk, mod } 当前保持中的键 */
+  finishTimer: null,   /* 自然结束后等待尾音收尾的定时器 */
+  holds: new Map(),    /* spec -> { timer, vk, mod, endAt } 当前保持中的键 */
   modRefs: new Map(),  /* 'shift'|'ctrl' -> 引用计数 */
 };
 
@@ -107,7 +108,7 @@ function strikeChord(chord) {
           ffi.postKey(S.hwnd, vk, false, S.mode);
           S.holds.delete(specKey);
         }, dur);
-        S.holds.set(specKey, { timer: tid, vk, mod: null });
+        S.holds.set(specKey, { timer: tid, vk, mod: null, endAt: nowMs() + dur });
       } else {
         /* 半音：原子轻点——修饰键按下 → 主键按下 → 保持 → 主键抬起 → 修饰键抬起 */
         const hold = Math.max(20, Math.min(120, chord.holdMs ?? S.holdMs));
@@ -119,7 +120,7 @@ function strikeChord(chord) {
           releaseMod(mod);
           S.holds.delete(spec);
         }, hold);
-        S.holds.set(spec, { timer: tid, vk, mod });
+        S.holds.set(spec, { timer: tid, vk, mod, endAt: nowMs() + hold });
       }
     }
   }
@@ -136,6 +137,7 @@ function startPlay(p) {
   S.idx = 0;
   S.stop = false; S.paused = false; S.running = true;
   S.lastProgress = 0; S.fgWarned = false;
+  if (S.finishTimer) { clearTimeout(S.finishTimer); S.finishTimer = null; } /* 上一曲的延迟收尾作废 */
   releaseAllHolds();
   while (S.idx < S.chords.length && S.chords[S.idx].t < S.offsetMs) S.idx++;
   S.anchorMs = nowMs() - S.offsetMs;
@@ -192,9 +194,24 @@ function scheduleNext() {
 
 function finish() {
   if (S.timer) { clearTimeout(S.timer); S.timer = null; }
-  releaseAllHolds(); /* 收尾必须抬键，防止游戏内粘键长鸣 */
   const finished = !S.stop && S.idx >= S.chords.length;
   S.running = false; S.paused = false;
+  if (finished && S.holds.size > 0) {
+    /* 自然结束且仍有延音保持中的键（如曲末长按音）：等它们自然收尾再报结束。
+     * 立刻抬键会把最后的尾音掐断（表现为曲末 2-3 秒被吞、戛然而止）。 */
+    if (S.finishTimer) clearTimeout(S.finishTimer);
+    let waitMs = 0;
+    for (const h of S.holds.values()) waitMs = Math.max(waitMs, (h.endAt || 0) - nowMs());
+    waitMs = Math.max(0, Math.min(waitMs + 60, HOLD_MAX_MS));
+    S.finishTimer = setTimeout(() => {
+      S.finishTimer = null;
+      releaseAllHolds(); /* 兜底抬键（正常此时已全部自然抬起，防游戏内粘键长鸣） */
+      post({ type: 'ended', sid: S.sid, finished: true, played: S.idx });
+    }, waitMs);
+    return;
+  }
+  if (S.finishTimer) { clearTimeout(S.finishTimer); S.finishTimer = null; }
+  releaseAllHolds(); /* 手动停止/异常/前台失焦：立即抬键防粘键 */
   post({ type: 'ended', sid: S.sid, finished, played: S.idx });
 }
 

@@ -51,7 +51,7 @@ const MidiPlayer = {
     this._cancelVoices();
     const res = this._buildQueue(this.song, this.settings);
     this.events = res.events;
-    this.duration = Math.max(res.lastT + 0.5, this.song.duration || 0, 1);
+    this.duration = Math.max(res.lastT + 0.5, (res.soundEndT || 0) + 0.35, this.song.duration || 0, 1);
     this.stats = res.stats;
     this.activeTrackLabel = res.trackLabel;
     this.melodyTrack = res.melodyTrack;
@@ -177,8 +177,12 @@ const MidiPlayer = {
     }
     events.sort((a, b) => a.t - b.t);
     const lastT = events.length ? events[events.length - 1].t + events[events.length - 1].dur : 0;
+    /* 真实音尾：所有音符（含踏板延音扩展）的最晚结束时刻。
+     * lastT 按"起始排序的最后一个事件"算，早响的长音可能结束得更晚。 */
+    let soundEndT = lastT;
+    for (const e of events) { const end = e.t + e.dur; if (end > soundEndT) soundEndT = end; }
     return {
-      events, lastT,
+      events, lastT, soundEndT,
       stats: { total, mapped: events.length, dropped },
       trackLabel,
       melodyTrack: melodyIdx,
@@ -220,10 +224,16 @@ const MidiPlayer = {
     else this.play();
   },
 
-  stop() {
+  stop(keepSound) {
     const changed = this.state !== 'stopped';
     this.state = 'stopped';
-    this._cancelVoices();
+    if (keepSound) {
+      /* 自然结束：不强制掐断声部，让最后的尾音按自身排程自然收尾 */
+      this.uiQueue.length = 0;
+      Keyboard.releaseAll('play');
+    } else {
+      this._cancelVoices();
+    }
     this.offset = 0;
     if (changed) this.onStateChange && this.onStateChange();
   },
@@ -287,7 +297,7 @@ const MidiPlayer = {
       if (this.log) this.log(`${midiToName(ev.midi)} · ${keyLabel(ev.midi)}`, 'note');
     }
     this._schedIdx = this.cursor; /* 已排程下标（丝滑变速防双发用） */
-    if (now >= this.duration) this.stop();
+    if (now >= this.duration) this.stop(true); /* 自然结束：保留尾音自然收尾 */
   },
 
   _cancelVoices() {
@@ -369,7 +379,7 @@ function buildPerfSchedule(song, st, speed) {
     stats: res.stats,
     trackLabel: res.trackLabel,
     melodyTrack: res.melodyTrack,
-    duration: res.lastT / speed + 0.5, /* 和弦时刻已按速度换算，时长同步换算 */
+    duration: Math.max(res.lastT / speed + 0.5, (res.soundEndT || 0) / speed + 0.3), /* 含曲末延音尾音 */
   };
 }
 window.buildPerfSchedule = buildPerfSchedule;
