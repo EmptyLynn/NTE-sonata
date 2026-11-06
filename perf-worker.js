@@ -247,6 +247,9 @@ parentPort.on('message', (m) => {
     }
     if (S.mode === 'fg') ffi.forceForeground(S.hwnd);
     post({ type: 'resumed', ok: true, t: S.offsetMs / 1000 });
+  } else if (m.type === 'hold') {
+    /* 演奏中实时调整按键时长（不影响调度时序，安全）：后续和弦即刻生效 */
+    S.holdMs = Math.max(2, Math.min(120, (m.value | 0) || 25));
   } else if (m.type === 'stop') {
     S.stop = true;
     S.running = false;

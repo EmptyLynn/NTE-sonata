@@ -1046,6 +1046,9 @@
       wrap.classList.toggle('hidden', !show);
       const sw = document.getElementById('set-guitar-sustain');
       if (sw) sw.setAttribute('aria-checked', String(this._guitarSustain !== false));
+      /* 按键时长仅吉他需要（钢琴固定 25ms）：钢琴模式下隐藏该控件 */
+      const holdRow = document.getElementById('perf-hold-row');
+      if (holdRow) holdRow.classList.toggle('hidden', Keyboard.instrument !== 'guitar');
     },
     openSettings() {
       document.getElementById('settings-modal').classList.remove('hidden');

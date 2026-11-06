@@ -76,6 +76,10 @@ const Perf = {
     this.els.hold.addEventListener('change', () => {
       this.holdMs = Math.max(10, Math.min(120, parseInt(this.els.hold.value, 10) || 25));
       this.savePrefs();
+      /* 按键时长不影响调度时序：演奏中也可实时调整，后续和弦即刻生效 */
+      if (this.active && this.state === 'playing' && window.yihuan && window.yihuan.perfHold) {
+        window.yihuan.perfHold(this.instrumentHoldMs());
+      }
     });
     this.els.countdown.addEventListener('change', () => {
       this.countdown = parseInt(this.els.countdown.value, 10) || 0;
@@ -124,7 +128,7 @@ const Perf = {
 
     const prefs = this.loadPrefs();
     this.mode = prefs.mode || 'bg';
-    this.holdMs = prefs.holdMs || 15;
+    this.holdMs = prefs.holdMs || 25;
     this.countdown = prefs.countdown != null ? prefs.countdown : 3;
     this.els.inputMode.value = this.mode;
     this.els.hold.value = String(this.holdMs);
@@ -135,6 +139,11 @@ const Perf = {
     }
     this.refreshWindows(false);
     this.refreshElevation();
+  },
+
+  /* 发给引擎的按键时长：钢琴固定 25ms（游戏按键无谓可调），吉他用滑杆值 */
+  instrumentHoldMs() {
+    return Keyboard.instrument === 'guitar' ? this.holdMs : 25;
   },
 
   async refreshElevation() {
@@ -370,7 +379,7 @@ const Perf = {
       chords: this.chords,
       hwnd: this.hwnd,
       mode: this.mode,
-      holdMs: this.holdMs,
+      holdMs: this.instrumentHoldMs(),
       offset: startReal,
       sid,
     });
@@ -495,7 +504,8 @@ const Perf = {
   LOCK_IDS: [
     'track-sel', 'track-custom', 'range-mode', 'speed', 'tr-minus', 'tr-plus',
     'inst-sel', 'volume', 'sustain',
-    'perf-window', 'perf-refresh', 'perf-auto', 'perf-input-mode', 'perf-hold',
+    'perf-window', 'perf-refresh', 'perf-auto', 'perf-input-mode',
+    /* perf-hold 不锁：按键时长不影响调度时序，演奏中实时调整即刻生效 */
     'perf-countdown', 'perf-test', 'perf-diagnose', 'perf-admin',
     'btn-pick', 'btn-library', 'mode-practice', 'mode-perf', 'btn-tour', 'btn-hints',
     'inst-piano', 'inst-guitar',

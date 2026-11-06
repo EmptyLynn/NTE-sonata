@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('yihuan', {
   perfStop: () => ipcRenderer.invoke('perf-stop'),
   perfRebase: (chords, offset) => ipcRenderer.invoke('perf-rebase', { chords, offset }),
   perfSeek: (offset, sid) => ipcRenderer.invoke('perf-seek', { offset, sid }),
+  perfHold: (value) => ipcRenderer.invoke('perf-hold', { value }),
   perfSelfHwnd: () => ipcRenderer.invoke('perf-self-hwnd'),
   fitWindowHeight: (h) => ipcRenderer.invoke('fit-window-height', h),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),

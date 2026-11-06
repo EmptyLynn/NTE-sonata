@@ -127,6 +127,13 @@ module.exports = {
       }
     });
 
+    /* 演奏中实时调整按键时长（转发给 worker，后续和弦即刻生效） */
+    ipcMain.handle('perf-hold', (_e, { value }) => {
+      if (!worker) return { ok: false, error: '引擎未运行' };
+      worker.postMessage({ type: 'hold', value: Number(value) || 25 });
+      return { ok: true };
+    });
+
     ipcMain.handle('perf-pause', () => {
       if (!worker) return { ok: true, state: 'stopped' };
       return new Promise((resolve) => {
