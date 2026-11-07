@@ -149,7 +149,6 @@
         /* 先记旧速度下的歌曲位置：调速应停在"歌里同一处"，进度条不跳 */
         const prevSongPos = (Perf.active && MidiPlayer.song) ? Perf.songPos() : 0;
         MidiPlayer.setSpeed(v);
-        this.saveSongParams({ speed: v });
         /* 演奏模式：丝滑变速——热重定基替换剩余调度，不断音 */
         if (Perf.active && MidiPlayer.song) {
           const playing = Perf.state === 'playing';
@@ -208,7 +207,6 @@
           MidiPlayer.rebuild(false);
         });
         this.saveSettings();
-        this.saveSongParams({ trackSel: MidiPlayer.settings.trackSel });
       });
       el.trackCustom.addEventListener('change', () => {
         this.applyAndRestart(() => {
@@ -216,7 +214,6 @@
           MidiPlayer.rebuild(false);
         });
         this.saveSettings();
-        this.saveSongParams({ customTracks: MidiPlayer.settings.customTracks });
       });
 
       el.rangeMode.addEventListener('change', () => {
@@ -225,7 +222,6 @@
           MidiPlayer.rebuild(false);
         });
         this.saveSettings();
-        this.saveSongParams({ rangeMode: MidiPlayer.settings.rangeMode });
       });
 
       el.instSel.addEventListener('change', async () => {
@@ -430,7 +426,6 @@
           Perf._dispT = Math.min(Perf._dispT, Perf.duration);
         }
         this.saveSettings();
-        this.saveSongParams({ transpose: v });
         return;
       }
       this.applyAndRestart(() => {
@@ -439,7 +434,6 @@
         MidiPlayer.rebuild(false);
       });
       this.saveSettings();
-      this.saveSongParams({ transpose: v });
     },
 
     switchTab(which) {
@@ -885,10 +879,28 @@
       Object.assign(all[id] || (all[id] = {}), patch);
       try { localStorage.setItem(this.SONG_PARAMS_KEY, JSON.stringify(all)); } catch { /* 忽略 */ }
     },
-    /* 加载曲谱时应用该曲保存的参数；返回是否恢复了参数 */
+    /* 加载曲谱时应用该曲保存的参数；无存档则恢复默认（不沿用上一首的调整）。
+     * 注意：存档里可能只有调性回填（key），不算有参数。 */
     applySongParams() {
       const p = this.loadSongParams(MidiPlayer.currentEntryId);
-      if (!p) return false;
+      const hasParams = p && ('speed' in p || 'transpose' in p || 'trackSel' in p || 'customTracks' in p || 'rangeMode' in p);
+      if (!p || !hasParams) {
+        MidiPlayer.speed = 1;
+        el.speed.value = '1';
+        el.speedVal.textContent = '1.00×';
+        this.refreshRangeFill(el.speed);
+        MidiPlayer.settings.transpose = 0;
+        el.trVal.textContent = '0';
+        MidiPlayer.settings.trackSel = 'all';
+        el.trackSel.value = 'all';
+        el.trackCustom.classList.add('hidden');
+        MidiPlayer.settings.customTracks = '';
+        el.trackCustom.value = '';
+        MidiPlayer.settings.rangeMode = 'fold';
+        el.rangeMode.value = 'fold';
+        MidiPlayer.rebuild(true);
+        return false;
+      }
       if (typeof p.speed === 'number' && p.speed >= 0.25 && p.speed <= 3) {
         MidiPlayer.speed = p.speed;
         el.speed.value = String(p.speed);
