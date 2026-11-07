@@ -97,7 +97,7 @@ const Library = {
         let meta = {};
         try {
           const song = MidiSource.parse(bytes);
-          meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo };
+          meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo, key: song.key || "" };
         } catch { /* 元数据解析失败仍可入库 */ }
         if (window.yihuan && window.yihuan.isElectron) {
           await window.yihuan.libraryAddData(bytes, s.title, meta, ['内置']);
@@ -204,7 +204,7 @@ const Library = {
       data = full.data;
     }
     this.close();
-    UI.loadSong(data, entry.title);
+    UI.loadSong(data, entry.title, entry.id);
   },
 
   /* ---------------- UI ---------------- */
@@ -269,7 +269,11 @@ const Library = {
     const cats = entry.categories || [];
     const meta = entry.meta || {};
     const dur = UI.fmtTime(meta.duration || 0);
-    const metaText = `${dur} · ${meta.notes || 0}音 · ${meta.tracks || 0}轨${meta.bpm ? ' · ' + meta.bpm + 'BPM' : ''}`;
+    /* 调性：入库 meta 优先，旧条目回退到每曲参数表（首次播放时回填） */
+    const songKey = meta.key
+      || (entry.id && UI.loadSongParams ? (UI.loadSongParams(entry.id) || {}).key : '')
+      || '';
+    const metaText = `${dur} · ${meta.notes || 0}音 · ${meta.tracks || 0}轨${meta.bpm ? ' · ' + meta.bpm + 'BPM' : ''}${songKey ? ' · ' + songKey : ''}`;
 
     const title = document.createElement('div');
     title.className = 'lib-title';

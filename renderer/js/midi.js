@@ -90,7 +90,51 @@ const MidiSource = {
       trackCount: midi.tracks.length,
       tracks,
       totalNotes: tracks.reduce((s, t) => s + t.noteCount, 0),
+      key: this.detectKey(midi, tracks),
     };
+  },
+
+  /* ---------- 调性检测 ----------
+   * 优先用 MIDI 调号元事件（SMF FF59，@tonejs/midi 解析为 header.keySignatures）；
+   * 缺失时退回 Krumhansl-Schmuckler 算法：时长加权的音级直方图与 24 个
+   * 大小调音阶轮廓做相关，取相关系数最高者。 */
+  detectKey(midi, tracks) {
+    try {
+      const ks = midi.header && midi.header.keySignatures;
+      if (Array.isArray(ks) && ks.length) {
+        return this._keyName(ks[0].key, ks[0].scale);
+      }
+      const hist = new Array(12).fill(0);
+      for (const t of tracks) {
+        for (const n of t.notes) hist[((n.midi % 12) + 12) % 12] += (n.dur || 0.25);
+      }
+      if (!hist.some((v) => v > 0)) return '';
+      const maj = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+      const min = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+      const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+      const corr = (h, prof) => {
+        const mh = mean(h), mp = mean(prof);
+        let num = 0, dh = 0, dp = 0;
+        for (let i = 0; i < 12; i++) { const a = h[i] - mh, b = prof[i] - mp; num += a * b; dh += a * a; dp += b * b; }
+        return num / Math.sqrt((dh * dp) || 1);
+      };
+      const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      let best = '', bestR = -2;
+      for (let r = 0; r < 12; r++) {
+        const rot = (p) => p.map((_, i) => p[(i + r) % 12]);
+        const rm = corr(hist, rot(maj));
+        const rn = corr(hist, rot(min));
+        if (rm > bestR) { bestR = rm; best = names[r] + '大调'; }
+        if (rn > bestR) { bestR = rn; best = names[r] + '小调'; }
+      }
+      return best;
+    } catch { return ''; }
+  },
+
+  _keyName(key, scale) {
+    const map = { C: 0, G: 7, D: 2, A: 9, E: 4, B: 11, 'F#': 6, 'C#': 1, F: 5, Bb: 10, Eb: 3, Ab: 8, Db: 1, Gb: 6, Cb: 11 };
+    const n = map[key] != null ? ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][map[key]] : key;
+    return (n || key) + (scale === 'minor' ? '小调' : '大调');
   },
 };
 window.MidiSource = MidiSource;

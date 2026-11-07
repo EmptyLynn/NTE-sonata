@@ -123,7 +123,7 @@
             if (have.has(title.trim().toLowerCase())) { skipped.push(title); continue; }
             have.add(title.trim().toLowerCase());
             added.push(title);
-            const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo };
+            const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo, key: song.key || "" };
             Library.add({ data: buf, title, meta });
             if (!loadedFirst) { loadedFirst = true; this.loadSong(buf, f.name); }
           }
@@ -148,6 +148,7 @@
         /* 先记旧速度下的歌曲位置：调速应停在"歌里同一处"，进度条不跳 */
         const prevSongPos = (Perf.active && MidiPlayer.song) ? Perf.songPos() : 0;
         MidiPlayer.setSpeed(v);
+        this.saveSongParams({ speed: v });
         /* 演奏模式：丝滑变速——热重定基替换剩余调度，不断音 */
         if (Perf.active && MidiPlayer.song) {
           const playing = Perf.state === 'playing';
@@ -175,6 +176,7 @@
           MidiPlayer.rebuild(false);
         });
         this.saveSettings();
+        this.saveSongParams({ trackSel: MidiPlayer.settings.trackSel });
       });
       el.trackCustom.addEventListener('change', () => {
         this.applyAndRestart(() => {
@@ -182,6 +184,7 @@
           MidiPlayer.rebuild(false);
         });
         this.saveSettings();
+        this.saveSongParams({ customTracks: MidiPlayer.settings.customTracks });
       });
 
       el.rangeMode.addEventListener('change', () => {
@@ -190,6 +193,7 @@
           MidiPlayer.rebuild(false);
         });
         this.saveSettings();
+        this.saveSongParams({ rangeMode: MidiPlayer.settings.rangeMode });
       });
 
       el.instSel.addEventListener('change', async () => {
@@ -394,6 +398,7 @@
           Perf._dispT = Math.min(Perf._dispT, Perf.duration);
         }
         this.saveSettings();
+        this.saveSongParams({ transpose: v });
         return;
       }
       this.applyAndRestart(() => {
@@ -402,6 +407,7 @@
         MidiPlayer.rebuild(false);
       });
       this.saveSettings();
+      this.saveSongParams({ transpose: v });
     },
 
     switchTab(which) {
@@ -778,7 +784,7 @@
         if (have.has(title.trim().toLowerCase())) { skipped.push(title); continue; }
         have.add(title.trim().toLowerCase());
         added.push(title);
-        const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo };
+        const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo, key: song.key || "" };
         Library.add({ srcPath: p, data: res.data, title, meta });
         if (!loadedFirst) {
           loadedFirst = true;
@@ -802,7 +808,7 @@
       Library.add({ srcPath, data, title, meta });
     },
 
-    loadSong(data, name) {
+    loadSong(data, name, entryId) {
       let song;
       try {
         song = MidiSource.parse(data);
@@ -812,18 +818,69 @@
         return;
       }
       MidiPlayer.load(song);
+      MidiPlayer.currentEntryId = entryId || null; /* 每曲独立参数的存取键 */
+      if (song.key) this.saveSongParams({ key: song.key }); /* 调性回填：曲库卡片可显示 */
 
       el.songName.textContent = song.name || name || '未命名乐曲';
       el.songMeta.textContent =
-        `${song.trackCount} 轨 · ${song.totalNotes} 音符 · ${this.fmtTime(song.duration)} · ${song.tempo} BPM`;
+        `${song.trackCount} 轨 · ${song.totalNotes} 音符 · ${this.fmtTime(song.duration)} · ${song.tempo} BPM${song.key ? ' · ' + song.key : ''}`;
       this.buildTrackInfo(song);
       el.timeTotal.textContent = this.fmtTime(MidiPlayer.duration);
       el.progressNote.textContent = '';
       if (Teaching.active) Teaching.stop();
+      const restored = this.applySongParams();
       this.refreshTransport();
       this.refreshProgress();
       if (Perf.active) Perf.rebuild();
-      this.log(`已加载「${song.name || name}」：${song.trackCount} 轨 ${song.totalNotes} 音符`, 'info');
+      this.log(`已加载「${song.name || name}」：${song.trackCount} 轨 ${song.totalNotes} 音符`
+        + (song.key ? ` · ${song.key}` : '')
+        + (restored ? '（已恢复该曲独立参数）' : ''), 'info');
+    },
+
+    /* ---------------- 每曲独立参数（速度/移调/轨道/超域） ---------------- */
+    SONG_PARAMS_KEY: 'yihuan.songParams.v1',
+    loadSongParams(id) {
+      if (!id) return null;
+      try { return (JSON.parse(localStorage.getItem(this.SONG_PARAMS_KEY)) || {})[id] || null; }
+      catch { return null; }
+    },
+    saveSongParams(patch) {
+      const id = MidiPlayer.currentEntryId;
+      if (!id) return;
+      let all;
+      try { all = JSON.parse(localStorage.getItem(this.SONG_PARAMS_KEY)) || {}; } catch { all = {}; }
+      Object.assign(all[id] || (all[id] = {}), patch);
+      try { localStorage.setItem(this.SONG_PARAMS_KEY, JSON.stringify(all)); } catch { /* 忽略 */ }
+    },
+    /* 加载曲谱时应用该曲保存的参数；返回是否恢复了参数 */
+    applySongParams() {
+      const p = this.loadSongParams(MidiPlayer.currentEntryId);
+      if (!p) return false;
+      if (typeof p.speed === 'number' && p.speed >= 0.25 && p.speed <= 3) {
+        MidiPlayer.speed = p.speed;
+        el.speed.value = String(p.speed);
+        el.speedVal.textContent = p.speed.toFixed(2) + '×';
+        this.refreshRangeFill(el.speed);
+      }
+      if (typeof p.transpose === 'number') {
+        MidiPlayer.settings.transpose = p.transpose;
+        el.trVal.textContent = (p.transpose > 0 ? '+' : '') + p.transpose;
+      }
+      if (p.trackSel) {
+        MidiPlayer.settings.trackSel = p.trackSel;
+        el.trackSel.value = p.trackSel;
+        el.trackCustom.classList.toggle('hidden', p.trackSel !== 'custom');
+      }
+      if (typeof p.customTracks === 'string') {
+        MidiPlayer.settings.customTracks = p.customTracks;
+        el.trackCustom.value = p.customTracks;
+      }
+      if (p.rangeMode) {
+        MidiPlayer.settings.rangeMode = p.rangeMode;
+        el.rangeMode.value = p.rangeMode;
+      }
+      MidiPlayer.rebuild(true);
+      return true;
     },
 
     buildTrackInfo(song) {

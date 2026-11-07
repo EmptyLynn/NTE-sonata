@@ -124,7 +124,7 @@
           <label class="ctl">
             <span class="ctl-name">超域</span>
             <span class="sel-wrap">
-              <select id="range-mode" title="超出 48–83 音域的处理方式">
+              <select id="range-mode" title="超出乐器音域的音符处理方式">
                 <option value="fold">八度折叠 fold</option>
                 <option value="shift">最优移调 shift</option>
                 <option value="cut">直接截断 cut</option>
@@ -179,12 +179,12 @@
                 </select>
               </span>
             </label>
-            <label class="ctl" id="perf-hold-row" title="吉他短击模式：每个按键按住的毫秒数（过长可能丢音，过短可能不触发）；钢琴固定 25ms 无需调整">
+            <label class="ctl" id="perf-hold-row" title="每个按键按住的毫秒数（过短可能不触发，过长可能丢音）">
               <span class="ctl-name">按键时长</span>
               <input id="perf-hold" type="number" min="10" max="120" step="1" value="25" style="width:58px">
               <span class="ctl-val">ms</span>
             </label>
-            <label class="ctl" title="点击演奏后延迟多少秒开始发送（前台模式留时间切到游戏）">
+            <label class="ctl" title="点击演奏后延迟多少秒开始发送">
               <span class="ctl-name">倒计时</span>
               <span class="sel-wrap">
                 <select id="perf-countdown">
@@ -202,7 +202,7 @@
           </div>
             <button id="perf-diagnose" class="btn btn-ghost" title="检查目标窗口状态与按键投递是否正常">诊断</button>
             <span id="perf-admin-chip" class="admin-chip">权限：检测中…</span>
-            <button id="perf-admin" class="btn hidden" title="游戏以管理员运行时，普通权限的按键会被 Windows 拦截（UIPI）">以管理员重启</button>
+            <button id="perf-admin" class="btn hidden" title="游戏以管理员运行时，软件也需要以管理员运行">以管理员重启</button>
           </div>
         </div>
       </section>
@@ -241,7 +241,7 @@
     <footer class="app-footer">
       <span class="footer-brand">异环乐器模拟器</span>
       <span class="footer-sep">·</span>
-      <span>设计与开发 <b>b站 @林羽empty</b></span><span class="footer-sep">·</span><span class="footer-ver">v1.1.5</span>
+      <span>设计与开发 <b>b站 @林羽empty</b></span><span class="footer-sep">·</span><span class="footer-ver">v1.1.6</span>
     </footer>
   </div>
 

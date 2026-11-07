@@ -310,8 +310,18 @@ const MidiPlayer = {
   consumeUi() {
     if (!AudioEngine.ctx || !this.uiQueue.length) return;
     const nowCtx = AudioEngine.ctx.currentTime;
-    while (this.uiQueue.length && this.uiQueue[0].at <= nowCtx + 0.005) {
-      const it = this.uiQueue.shift();
+    /* 队列按推送序存放：长音的 note-off(按下+时长) 会排在后续音符 note-on 之后，
+     * 若只消费队头有序前缀，后面的琴键点亮会被堵到长音结束才触发
+     * （表现为琴键不随音符点亮、回声条缺失）。改为扫描消费全部到期项。 */
+    const due = [];
+    let k = 0;
+    while (k < this.uiQueue.length) {
+      if (this.uiQueue[k].at <= nowCtx + 0.005) due.push(this.uiQueue.splice(k, 1)[0]);
+      else k++;
+    }
+    if (!due.length) return;
+    if (due.length > 1) due.sort((a, b) => a.at - b.at);
+    for (const it of due) {
       if (it.on) Keyboard.press(it.midi, 'play');
       else Keyboard.release(it.midi, 'play');
     }
