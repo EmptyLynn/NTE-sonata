@@ -902,3 +902,59 @@ body.no-hints .key .hint { opacity: 0; }
 .perf-sustain { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; margin-left: 6px; }
 .perf-sustain.hidden { display: none !important; }
 .perf-sustain .ps-label { font-size: 12px; font-weight: 650; color: var(--ink-soft); }
+
+/* ═══════════ 曲库批量操作 ═══════════ */
+.lib-check {
+  position: absolute; top: 9px; right: 9px; z-index: 2;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid rgba(35, 38, 47, 0.22); background: #fff;
+  display: none; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+  transition: background 0.15s var(--ease-out), border-color 0.15s, transform 0.15s;
+}
+.lib-modal.batching .lib-check { display: flex; }
+.lib-modal.batching .lib-card { cursor: pointer; }
+.lib-modal.batching .lib-act { display: none !important; }
+.lib-modal.batching .lib-cat { pointer-events: none; opacity: 0.55; }
+.lib-card.selected { box-shadow: 0 0 0 2.5px var(--accent), 0 6px 18px rgba(233, 87, 110, 0.28); border-color: transparent; }
+.lib-card.selected .lib-check { background: var(--accent); border-color: var(--accent); transform: scale(1.08); }
+.lib-card.selected .lib-check::after { content: '✓'; }
+
+.lib-batchbar {
+  position: sticky; bottom: 0; z-index: 6;
+  display: none; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding: 9px 12px; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px);
+  border: 1px solid rgba(35, 38, 47, 0.08);
+  box-shadow: 0 -2px 16px rgba(23, 26, 36, 0.09);
+}
+.lib-modal.batching .lib-batchbar { display: flex; }
+.lib-batchbar.hidden { display: none !important; }
+.lib-batchcount { font-size: 13px; font-weight: 750; color: var(--accent); white-space: nowrap; }
+.lib-batchbtns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.lib-batchbtns .btn { font-size: 12px; padding: 5px 11px; }
+.lib-danger { color: #d64553; }
+.lib-danger.confirming { background: #d64553 !important; color: #fff !important; }
+
+.lib-catpop {
+  position: absolute; bottom: 54px; right: 14px; z-index: 9;
+  min-width: 190px; max-height: 260px; overflow: auto;
+  background: #fff; border-radius: 14px; padding: 8px;
+  border: 1px solid rgba(35, 38, 47, 0.1);
+  box-shadow: 0 12px 32px rgba(23, 26, 36, 0.2);
+}
+.lib-catpop .cat-head { font-size: 12px; font-weight: 700; color: var(--ink-faint); padding: 4px 10px 6px; }
+.lib-catpop .cat-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  padding: 7px 10px; border: none; background: none; border-radius: 9px;
+  cursor: pointer; font-size: 13px; text-align: left; color: var(--ink);
+}
+.lib-catpop .cat-item:hover { background: rgba(35, 38, 47, 0.06); }
+.lib-catpop .cat-item .cnt { font-size: 11px; color: var(--ink-faint); }
+.lib-catpop .cat-none { font-size: 12px; color: var(--ink-faint); padding: 6px 10px; }
+.lib-catpop .cat-new { display: flex; gap: 6px; margin-top: 6px; padding-top: 8px; border-top: 1px dashed rgba(35, 38, 47, 0.14); }
+.lib-catpop .cat-new input {
+  flex: 1; min-width: 0; border: 1px solid rgba(35, 38, 47, 0.18);
+  border-radius: 8px; padding: 5px 9px; font-size: 12px; outline: none;
+}
+.lib-catpop .cat-new input:focus { border-color: var(--accent); }

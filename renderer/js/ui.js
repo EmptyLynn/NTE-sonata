@@ -124,8 +124,9 @@
             have.add(title.trim().toLowerCase());
             added.push(title);
             const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo, key: song.key || "" };
-            Library.add({ data: buf, title, meta });
-            if (!loadedFirst) { loadedFirst = true; this.loadSong(buf, f.name); }
+            Library.add({ data: buf, title, meta }).then((ent) => {
+              if (!loadedFirst) { loadedFirst = true; this.loadSong(buf, f.name, ent && ent.id); }
+            });
           }
           if (skipped.length) this.log(`已跳过曲库中已有的同名曲目：${skipped.join('、')}`, 'warn');
           if (added.length > 1) this.log(`批量导入完成：新增 ${added.length} 首入库，当前加载「${added[0]}」`, 'info');
@@ -168,6 +169,37 @@
 
       el.trMinus.addEventListener('click', () => this.setTranspose(MidiPlayer.settings.transpose - 1));
       el.trPlus.addEventListener('click', () => this.setTranspose(MidiPlayer.settings.transpose + 1));
+
+      /* 保存参数按钮 + 确认弹窗 */
+      const spModal = document.getElementById('saveparams-modal');
+      document.getElementById('btn-save-params').addEventListener('click', () => {
+        if (!MidiPlayer.song) { this.log('请先加载乐曲再保存参数', 'warn'); return; }
+        if (!MidiPlayer.currentEntryId) { this.log('该乐曲未关联曲库条目，无法保存专属参数', 'warn'); return; }
+        const title = el.songName.textContent || '当前乐曲';
+        document.getElementById('sp-title').textContent = `保存「${title}」的演奏参数`;
+        document.getElementById('sp-body').innerHTML =
+          `将当前 <b>速度 ${MidiPlayer.speed.toFixed(2)}× · 移调 ${MidiPlayer.settings.transpose > 0 ? '+' : ''}${MidiPlayer.settings.transpose}`
+          + ` · 轨道 ${MidiPlayer.activeTrackLabel || '默认'} · 超域 ${MidiPlayer.settings.rangeMode}</b>`
+          + ' 保存为这首曲子的专属配置？<br><span class="dim">练习/演奏两种模式、钢琴/吉他两种乐器加载时都会自动套用。</span>';
+        spModal.classList.remove('hidden');
+      });
+      const spClose = () => spModal.classList.add('hidden');
+      document.getElementById('sp-cancel').addEventListener('click', spClose);
+      spModal.querySelector('.lib-backdrop').addEventListener('click', spClose);
+      document.getElementById('sp-ok').addEventListener('click', () => {
+        const id = MidiPlayer.currentEntryId;
+        if (!id) { spClose(); return; }
+        this.saveSongParams({
+          speed: MidiPlayer.speed,
+          transpose: MidiPlayer.settings.transpose,
+          trackSel: MidiPlayer.settings.trackSel,
+          customTracks: MidiPlayer.settings.customTracks,
+          rangeMode: MidiPlayer.settings.rangeMode,
+        });
+        spClose();
+        const title = el.songName.textContent || '当前乐曲';
+        this.log(`已保存「${title}」的专属参数：速度 ${MidiPlayer.speed.toFixed(2)}× · 移调 ${MidiPlayer.settings.transpose > 0 ? '+' : ''}${MidiPlayer.settings.transpose} · 超域 ${MidiPlayer.settings.rangeMode}`, 'info');
+      });
 
       el.trackSel.addEventListener('change', () => {
         el.trackCustom.classList.toggle('hidden', el.trackSel.value !== 'custom');
@@ -785,11 +817,12 @@
         have.add(title.trim().toLowerCase());
         added.push(title);
         const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo, key: song.key || "" };
-        Library.add({ srcPath: p, data: res.data, title, meta });
-        if (!loadedFirst) {
-          loadedFirst = true;
-          this.loadSong(res.data, name); /* 第一首新曲直接载入播放器 */
-        }
+        Library.add({ srcPath: p, data: res.data, title, meta }).then((ent) => {
+          if (!loadedFirst) {
+            loadedFirst = true;
+            this.loadSong(res.data, name, ent && ent.id); /* 第一首新曲直接载入播放器 */
+          }
+        });
       }
       if (skipped.length) this.log(`已跳过曲库中已有的同名曲目：${skipped.join('、')}`, 'warn');
       if (added.length > 1) this.log(`批量导入完成：新增 ${added.length} 首入库，当前加载「${added[0]}」`, 'info');

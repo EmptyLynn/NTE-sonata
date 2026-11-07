@@ -59,6 +59,49 @@ const Library = {
       if (e.key === 'Escape' && !this.els.modal.classList.contains('hidden')) this.close();
     });
 
+    /* ---------------- 批量操作 ---------------- */
+    this.batch = false;
+    this.selected = new Set();
+    this._delArm = 0; /* 删除按钮双击确认计时 */
+    const $ = (id) => document.getElementById(id);
+    this.els.batchBtn = $('lib-batch');
+    this.els.batchBar = $('lib-batchbar');
+    this.els.batchCount = $('lib-batchcount');
+    this.els.batchModal = document.getElementById('lib-modal');
+    this.els.selAll = $('lib-selall');
+    this.els.catAdd = $('lib-cat-add');
+    this.els.catRm = $('lib-cat-rm');
+    this.els.clearParams = $('lib-clearparams');
+    this.els.delBtn = $('lib-del');
+    this.els.batchExit = $('lib-batchexit');
+    this.els.catPop = $('lib-catpop');
+
+    this.els.batchBtn.addEventListener('click', () => this.toggleBatch());
+    this.els.batchExit.addEventListener('click', () => this.toggleBatch(false));
+    this.els.selAll.addEventListener('click', () => {
+      const list = this.visibleEntries();
+      if (this.selected.size >= list.length) this.selected.clear();
+      else list.forEach((en) => this.selected.add(en.id));
+      this.render();
+      this.updateBatchBar();
+    });
+    this.els.delBtn.addEventListener('click', () => {
+      if (!this.selected.size) return;
+      if (!this._delArm) { /* 双击确认：第一次只变红警告 */
+        this._delArm = Date.now();
+        this.els.delBtn.textContent = `确认删除 ${this.selected.size} 首`;
+        this.els.delBtn.classList.add('confirming');
+        setTimeout(() => { this._delArm = 0; this.els.delBtn.textContent = '删除'; this.els.delBtn.classList.remove('confirming'); }, 2600);
+        return;
+      }
+      this.removeSelected();
+    });
+    this.els.clearParams.addEventListener('click', () => this.clearParams());
+    this.els.catAdd.addEventListener('click', (e) => { e.stopPropagation(); this.showBatchCatPop('add'); });
+    this.els.catRm.addEventListener('click', (e) => { e.stopPropagation(); this.showBatchCatPop('remove'); });
+    this.els.catPop.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => this.els.catPop.classList.add('hidden'));
+
     this._initPromise = this.refresh().then(() => this.seedBuiltins());
     return this._initPromise;
   },
@@ -143,25 +186,28 @@ const Library = {
     this.render();
   },
 
-  /* 导入：data 用于浏览器模式入库；srcPath 用于 Electron 复制 */
+  /* 导入：data 用于浏览器模式入库；srcPath 用于 Electron 复制。返回新条目（含 id） */
   async add({ srcPath, data, title, meta }) {
     try {
+      let entry = null;
       if (window.yihuan && window.yihuan.isElectron && srcPath) {
         const res = await window.yihuan.libraryAdd(srcPath, title, meta, []);
         if (!res.ok) throw new Error(res.error);
+        entry = res.entry;
       } else if (data) {
         const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
         const db = await this.idb();
-        await this.req(this.idbTx(db, 'readwrite').put({
-          id, title, addedAt: Date.now(), categories: [], meta: meta || {}, data,
-        }));
+        entry = { id, title, addedAt: Date.now(), categories: [], meta: meta || {}, data };
+        await this.req(this.idbTx(db, 'readwrite').put(entry));
       } else {
-        return;
+        return null;
       }
       await this.refresh();
       if (UI && UI.log) UI.log(`已加入曲库：「${title}」`, 'info');
+      return entry;
     } catch (err) {
       if (UI && UI.log) UI.log('加入曲库失败：' + (err.message || err), 'err');
+      return null;
     }
   },
 
@@ -207,6 +253,146 @@ const Library = {
     UI.loadSong(data, entry.title, entry.id);
   },
 
+  /* ---------------- 批量操作 ---------------- */
+  toggleBatch(force) {
+    this.batch = typeof force === 'boolean' ? force : !this.batch;
+    if (!this.batch) this.selected.clear();
+    this.els.batchModal.classList.toggle('batching', this.batch);
+    this.els.batchBtn.textContent = this.batch ? '✓ 多选中' : '☐ 多选';
+    this.els.batchBtn.classList.toggle('active', this.batch);
+    this._delArm = 0;
+    this.els.delBtn.textContent = '删除';
+    this.els.delBtn.classList.remove('confirming');
+    this.els.catPop.classList.add('hidden');
+    this.render();
+    this.updateBatchBar();
+  },
+
+  updateBatchBar() {
+    this.els.batchCount.textContent = `已选 ${this.selected.size} 首`;
+  },
+
+  toggleSelect(id) {
+    if (this.selected.has(id)) this.selected.delete(id);
+    else this.selected.add(id);
+    this.updateBatchBar();
+  },
+
+  /* 批量分类弹层：mode = 'add' | 'remove' */
+  showBatchCatPop(mode) {
+    const pop = this.els.catPop;
+    pop.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'cat-head';
+    head.textContent = (mode === 'add' ? '添加到分类' : '移出分类') + `（已选 ${this.selected.size} 首）`;
+    pop.appendChild(head);
+
+    /* 收集全部曲库出现过的分类 */
+    const counts = new Map();
+    for (const en of this.entries) {
+      for (const c of en.categories || []) counts.set(c, (counts.get(c) || 0) + 1);
+    }
+    const cats = [...counts.keys()];
+    if (!cats.length) {
+      const none = document.createElement('div');
+      none.className = 'cat-none';
+      none.textContent = '还没有分类，在下方新建一个';
+      pop.appendChild(none);
+    }
+    for (const c of cats) {
+      const b = document.createElement('button');
+      b.className = 'cat-item';
+      b.innerHTML = `<span>${c}</span><span class="cnt">${counts.get(c)} 首</span>`;
+      b.addEventListener('click', () => { this.applyBatchCategories(mode, c); pop.classList.add('hidden'); });
+      pop.appendChild(b);
+    }
+    /* 新建分类（仅添加模式） */
+    if (mode === 'add') {
+      const row = document.createElement('div');
+      row.className = 'cat-new';
+      const input = document.createElement('input');
+      input.placeholder = '新分类名称（≤12 字）';
+      input.maxLength = 12;
+      const ok = document.createElement('button');
+      ok.className = 'btn btn-primary';
+      ok.style.fontSize = '12px';
+      ok.style.padding = '5px 10px';
+      ok.textContent = '创建';
+      const submit = () => {
+        const name = input.value.trim();
+        if (!name) return;
+        this.applyBatchCategories('add', name);
+        pop.classList.add('hidden');
+      };
+      ok.addEventListener('click', submit);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+      row.appendChild(input);
+      row.appendChild(ok);
+      pop.appendChild(row);
+      setTimeout(() => input.focus(), 50);
+    }
+    pop.classList.remove('hidden');
+  },
+
+  /* 对选中条目批量加/移分类；force = 覆盖为新列表（单分类模式用） */
+  async applyBatchCategories(mode, cat) {
+    if (!this.selected.size) return;
+    const ids = [...this.selected];
+    for (const id of ids) {
+      const en = this.entries.find((e) => e.id === id);
+      if (!en) continue;
+      const cats = new Set(en.categories || []);
+      if (mode === 'add') cats.add(cat);
+      else cats.delete(cat);
+      en.categories = [...cats];
+      if (window.yihuan && window.yihuan.isElectron) {
+        await window.yihuan.libraryUpdate(id, undefined, en.categories);
+      } else {
+        const db = await this.idb();
+        const full = await this.req(this.idbTx(db, 'readonly').get(id));
+        if (full) { full.categories = en.categories; await this.req(this.idbTx(db, 'readwrite').put(full)); }
+      }
+    }
+    await this.refresh();
+    this.render();
+    const name = mode === 'add' ? '已添加到分类' : '已移出分类';
+    UI.log(`${name}「${cat}」：${ids.length} 首`, 'info');
+  },
+
+  async removeSelected() {
+    const ids = [...this.selected];
+    if (!ids.length) return;
+    for (const id of ids) {
+      const en = this.entries.find((e) => e.id === id);
+      if (en && MidiPlayer.currentEntryId === id) MidiPlayer.currentEntryId = null; /* 载入中的曲目被删：断开参数关联 */
+      await this.remove(id);
+    }
+    /* 同步清掉这些曲目的独立参数 */
+    try {
+      const all = JSON.parse(localStorage.getItem(UI.SONG_PARAMS_KEY)) || {};
+      for (const id of ids) delete all[id];
+      localStorage.setItem(UI.SONG_PARAMS_KEY, JSON.stringify(all));
+    } catch { /* 忽略 */ }
+    this.selected.clear();
+    this._delArm = 0;
+    this.els.delBtn.textContent = '删除';
+    this.els.delBtn.classList.remove('confirming');
+    this.render();
+    this.updateBatchBar();
+    UI.log(`已删除 ${ids.length} 首乐曲`, 'info');
+  },
+
+  async clearParams() {
+    const ids = [...this.selected];
+    if (!ids.length) return;
+    try {
+      const all = JSON.parse(localStorage.getItem(UI.SONG_PARAMS_KEY)) || {};
+      for (const id of ids) delete all[id];
+      localStorage.setItem(UI.SONG_PARAMS_KEY, JSON.stringify(all));
+    } catch { /* 忽略 */ }
+    UI.log(`已清除 ${ids.length} 首乐曲的独立参数（速度/移调/轨道/超域）`, 'info');
+  },
+
   /* ---------------- UI ---------------- */
   updateBadge() {
     this.els.badge.textContent = String(this.entries.length);
@@ -214,7 +400,11 @@ const Library = {
   },
 
   open() { this.els.modal.classList.remove('hidden'); this.render(); },
-  close() { this.els.modal.classList.add('hidden'); this.hideCatPop(); },
+  close() {
+    this.els.modal.classList.add('hidden');
+    this.hideCatPop();
+    if (this.batch) this.toggleBatch(false); /* 关闭弹窗退出批量态 */
+  },
 
   setView(v) {
     this.view = v;
@@ -330,7 +520,19 @@ const Library = {
     confirm.append(yes, no);
 
     card.append(title, sub, tags, actions, confirm);
-    card.addEventListener('click', () => this.loadEntry(entry));
+    /* 多选圈（仅批量模式显示） */
+    const check = document.createElement('span');
+    check.className = 'lib-check';
+    card.appendChild(check);
+    if (this.selected.has(entry.id)) card.classList.add('selected');
+    card.addEventListener('click', () => {
+      if (this.batch) {
+        card.classList.toggle('selected');
+        this.toggleSelect(entry.id);
+        return;
+      }
+      this.loadEntry(entry);
+    });
     return card;
   },
 
