@@ -93,6 +93,19 @@ function createWindow() {
     /* 自测窗口移到屏幕外：不节流、能收消息，且不会被人为点击干扰 */
     win.once('ready-to-show', () => win.setPosition(-3000, 0));
   }
+  /* 渲染进程报错落盘（userData/renderer-errors.log）：装机版没有开发者工具，
+   * 启动序列挂死等问题靠它定位。≥ 警告级别才记，文件超 256KB 轮转。 */
+  win.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    try {
+      if (level < 2) return;
+      const logPath = path.join(app.getPath('userData'), 'renderer-errors.log');
+      try {
+        const st = fs.statSync(logPath);
+        if (st.size > 256 * 1024) fs.unlinkSync(logPath);
+      } catch { /* 首次不存在 */ }
+      fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${message} (${sourceId}:${line})\n`);
+    } catch { /* 日志失败不影响运行 */ }
+  });
   /* 彻底移除菜单栏：Alt 键无菜单可弹（此前 Alt 误触会让 File/Edit 菜单栏
    * 闪现，且随后 Ctrl+字母被当作菜单快捷键误触），从根上消灭此类问题 */
   win.setMenu(null);

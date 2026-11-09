@@ -64,8 +64,15 @@
         this.log('已紧急静音/停止（Esc）', 'warn');
       };
 
-      this.bindControls();
-      this.restoreSettings();
+      /* 设置恢复隔离：哪怕抛错也只影响个性化，不中断后续 init
+       * （此前恢复抛错会让音色永远停在"加载中…"） */
+      try {
+        this.bindControls();
+        this.restoreSettings();
+      } catch (e) {
+        try { this.log('⚠ 控件绑定/设置恢复异常：' + (e.message || e), 'err'); } catch (_) {}
+        console.error('[init] bindControls/restoreSettings 失败:', e);
+      }
       this.refreshRangeFill(el.progress);
       this.refreshRangeFill(el.speed);
       this.refreshRangeFill(el.volume);
@@ -695,7 +702,7 @@
         const g = groups[groups.length - 1];
         if (!g.keys.includes(midiKeyHint(ev.midi))) g.keys.push(midiKeyHint(ev.midi));
       }
-      const title = (song.name || el.songName.textContent || '未命名').replace(/\.[a-z]+$/i, '');
+      const title = (el.songName.textContent || song.name || '未命名').replace(/\.[a-z]+$/i, '');
       const now = new Date();
       const L = [];
       L.push(`《${title}》 键盘谱`);
@@ -877,7 +884,7 @@
         duration: song.duration, notes: song.totalNotes,
         tracks: song.trackCount, bpm: song.tempo,
       } : {};
-      const title = (song && song.name) || name.replace(/\.(midi?|rmi)$/i, '') || '未命名';
+      const title = name.replace(/\.(midi?|rmi)$/i, '') || '未命名'; /* 文件名做标题，防内嵌乐器名撞车 */
       Library.add({ srcPath, data, title, meta });
     },
 
@@ -894,7 +901,10 @@
       MidiPlayer.currentEntryId = entryId || null; /* 每曲独立参数的存取键 */
       if (song.key) this.saveSongParams({ key: song.key }); /* 调性回填：曲库卡片可显示 */
 
-      el.songName.textContent = song.name || name || '未命名乐曲';
+      /* 标题以曲库标题（文件名）为准：内嵌轨道名可能是乐器名（如 boz.mid 的 "Grand Piano"） */
+      const displayTitle = name || song.name || '未命名乐曲';
+      const embeddedName = song.name && song.name !== name ? song.name : '';
+      el.songName.textContent = displayTitle;
       el.songMeta.textContent =
         `${song.trackCount} 轨 · ${song.totalNotes} 音符 · ${this.fmtTime(song.duration)} · ${song.tempo} BPM${song.key ? ' · ' + song.key : ''}`;
       this.buildTrackInfo(song);
@@ -905,8 +915,9 @@
       this.refreshTransport();
       this.refreshProgress();
       if (Perf.active) Perf.rebuild();
-      this.log(`已加载「${song.name || name}」：${song.trackCount} 轨 ${song.totalNotes} 音符`
+      this.log(`已加载「${displayTitle}」：${song.trackCount} 轨 ${song.totalNotes} 音符`
         + (song.key ? ` · ${song.key}` : '')
+        + (embeddedName ? ` · 内嵌名「${embeddedName}」` : '')
         + (restored ? '（已恢复该曲独立参数）' : ''), 'info');
     },
 
@@ -1268,6 +1279,18 @@
       try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch { /* 忽略 */ }
     },
     restoreSettings() {
+      /* 存储健康探针：localStorage 不可用（上次强杀导致的存储损坏等）时明确告知 */
+      try {
+        const probe = '__yihuan_probe';
+        localStorage.setItem(probe, '1');
+        localStorage.removeItem(probe);
+        this._storageOk = true;
+      } catch (e) {
+        this._storageOk = false;
+        this.log('⚠ 个性化存储不可用（可能因上次异常退出导致存储损坏），本次的个性化改动不会被保存。'
+          + '可尝试重启电脑，或删除 %APPDATA%\\yihuan-piano-zcode 下的 "Local Storage" 文件夹后重启应用。', 'err');
+        console.error('[init] localStorage 探针失败:', e);
+      }
       const s = this.loadSettings();
       if (typeof s.speed === 'number' && s.speed >= 0.25 && s.speed <= 3) {
         el.speed.value = String(s.speed);
