@@ -79,6 +79,7 @@
       this.refreshRangeFill(el.sustain);
       window.VizSource = MidiPlayer;
       Perf.init();
+      /* 画布初始化必须先于设置恢复：恢复时 switchTab('echo') 会调用 Viz._resizeEcho */
       Viz.init(el.viz);
       Viz.initEcho($('echo-viz'));
       Tour.init();
@@ -497,8 +498,8 @@
       el.vizWrap.classList.toggle('hidden', !states.viz);
       el.echoWrap.classList.toggle('hidden', !states.echo);
       el.log.classList.toggle('hidden', !states.log);
-      if (states.viz) Viz._resize();
-      if (states.echo) Viz._resizeEcho();
+      if (states.viz && Viz._resize) Viz._resize();
+      if (states.echo && Viz._resizeEcho) Viz._resizeEcho(); /* 画布未初始化时跳过（启动恢复阶段） */
       this.saveSettings();
     },
 
@@ -1041,7 +1042,7 @@
         b.classList.toggle('active', this._echoRainbow ? v === 'rainbow' : v === this._echoColor);
       });
       const custom = document.getElementById('echo-custom');
-      if (custom && !this._echoRainbow) custom.value = this._echoColor;
+      if (custom && !this._echoRainbow) custom.value = this._echoColor || '#39b98c';
     },
     applyAccent(hex) {
       this._themeAccent = hex;
