@@ -1,8 +1,10 @@
 /* 预加载脚本：以受控方式向渲染层暴露主进程能力（contextIsolation 安全桥） */
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('yihuan', {
   isElectron: true,
+  /* File.path 在 contextIsolation 隔离世界不可靠（拖拽文件拿不到路径的根源） */
+  getPathForFile: (file) => { try { return webUtils.getPathForFile(file) || ''; } catch { return ''; } },
   pickMidiFile: () => ipcRenderer.invoke('pick-midi'),
   readMidiFile: (filePath) => ipcRenderer.invoke('read-midi', filePath),
   listInstruments: () => ipcRenderer.invoke('list-instruments'),

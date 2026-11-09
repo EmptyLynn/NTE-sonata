@@ -107,7 +107,7 @@
       el.fileInput.addEventListener('change', async () => {
         const files = [...el.fileInput.files];
         if (files.length && window.yihuan && window.yihuan.isElectron) {
-          await this.importMidiFiles(files.map((f) => f.path).filter(Boolean));
+          await this.importMidiFiles(files.map((f) => this.filePathOf(f)).filter(Boolean));
         } else if (files.length) {
           /* 浏览器（非 Electron）回退：批量入库（IndexedDB），第一首载入播放器 */
           await Library.refresh();
@@ -217,7 +217,7 @@
       window.addEventListener('drop', (e) => {
         e.preventDefault();
         const files = [...((e.dataTransfer && e.dataTransfer.files) || [])].filter((f) => /\.(midi?|rmi)$/i.test(f.name));
-        if (!files.length) return;
+        if (!files.length) { this.toast('没有可导入的 MIDI 文件', 'warn'); return; }
         const names = files.map((f) => f.name).join('、');
         this.spOpen(
           `导入 ${files.length} 个 MIDI 文件`,
@@ -225,7 +225,7 @@
           '导入',
           () => {
             if (window.yihuan && window.yihuan.isElectron) {
-              this.importMidiFiles(files.map((f) => f.path).filter(Boolean));
+              this.importMidiFiles(files.map((f) => this.filePathOf(f)).filter(Boolean));
             } else {
               const dt = new DataTransfer();
               files.forEach((f) => dt.items.add(f));
@@ -290,12 +290,6 @@
           this.applyEchoColor();
           this.saveSettings();
         });
-      });
-      document.getElementById('echo-custom').addEventListener('input', (e) => {
-        this._echoRainbow = false;
-        this._echoColor = e.target.value;
-        this.applyEchoColor();
-        this.saveSettings();
       });
       document.querySelectorAll('#theme-swatches .swatch').forEach((b) => {
         b.addEventListener('click', () => { this.applyAccent(b.dataset.theme); this.saveSettings(); });
@@ -1147,6 +1141,7 @@
     /* 整套主题套用：全变量循环 + 瀑布流配色联动 */
     applyTheme(t) {
       this._theme = t.name;
+      this._themeAccent = t.vars['--accent']; /* 同步点缀色存档，否则换主题后保存的还是旧色 */
       const root = document.documentElement.style;
       for (const kv of Object.entries(t.vars)) root.setProperty(kv[0], kv[1]);
       this.applyNoteColors(t.melody, t.acc);
@@ -1229,6 +1224,14 @@
       if (!inp) return;
       const label = inp.closest('.swatch-custom');
       if (label) { label.style.background = color; label.style.color = '#fff'; }
+    },
+
+    /* 拿文件的磁盘路径：优先 webUtils（contextIsolation 下 File.path 不可靠） */
+    filePathOf(file) {
+      if (window.yihuan && window.yihuan.getPathForFile) {
+        try { const p = window.yihuan.getPathForFile(file); if (p) return p; } catch { /* 忽略 */ }
+      }
+      return file.path || null;
     },
 
     openSettings() {
