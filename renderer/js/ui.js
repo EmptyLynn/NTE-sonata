@@ -119,13 +119,13 @@
             let song;
             try { song = MidiSource.parse(buf); }
             catch (err) { this.log(`解析失败：${f.name}（${err.message}）`, 'err'); continue; }
-            const title = song.name || f.name.replace(/\.(midi?|rmi)$/i, '') || '未命名';
+            const title = f.name.replace(/\.(midi?|rmi)$/i, '') || '未命名'; /* 标题用文件名：内嵌轨道名可能是乐器名（如 boz.mid 的 "Grand Piano"），不同文件会撞名 */
             if (have.has(title.trim().toLowerCase())) { skipped.push(title); continue; }
             have.add(title.trim().toLowerCase());
             added.push(title);
             const meta = { duration: song.duration, notes: song.totalNotes, tracks: song.trackCount, bpm: song.tempo, key: song.key || "" };
             Library.add({ data: buf, title, meta }).then((ent) => {
-              if (!loadedFirst) { loadedFirst = true; this.loadSong(buf, f.name, ent && ent.id); }
+              if (!loadedFirst) { loadedFirst = true; this.loadSong(buf, title, ent && ent.id); }
             });
           }
           if (skipped.length) this.log(`已跳过曲库中已有的同名曲目：${skipped.join('、')}`, 'warn');
@@ -171,33 +171,69 @@
 
       /* 保存参数按钮 + 确认弹窗 */
       const spModal = document.getElementById('saveparams-modal');
+      /* 通用确认弹窗（保存参数 / 拖拽导入 共用）：spOpen(标题, 正文HTML, 确认按钮文字, 确认回调) */
+      this._spAction = null;
+      const spClose = () => { spModal.classList.add('hidden'); this._spAction = null; };
+      this.spOpen = (title, bodyHtml, okText, action) => {
+        document.getElementById('sp-title').textContent = title;
+        document.getElementById('sp-body').innerHTML = bodyHtml;
+        document.getElementById('sp-ok').textContent = okText || '确定';
+        this._spAction = action || null;
+        spModal.classList.remove('hidden');
+      };
+      document.getElementById('sp-cancel').addEventListener('click', spClose);
+      spModal.querySelector('.lib-backdrop').addEventListener('click', spClose);
+      document.getElementById('sp-ok').addEventListener('click', () => {
+        const action = this._spAction;
+        spClose();
+        if (action) action();
+      });
       document.getElementById('btn-save-params').addEventListener('click', () => {
         if (!MidiPlayer.song) { this.log('请先加载乐曲再保存参数', 'warn'); return; }
         if (!MidiPlayer.currentEntryId) { this.log('该乐曲未关联曲库条目，无法保存专属参数', 'warn'); return; }
         const title = el.songName.textContent || '当前乐曲';
-        document.getElementById('sp-title').textContent = `保存「${title}」的演奏参数`;
-        document.getElementById('sp-body').innerHTML =
+        this.spOpen(
+          `保存「${title}」的演奏参数`,
           `将当前 <b>速度 ${MidiPlayer.speed.toFixed(2)}× · 移调 ${MidiPlayer.settings.transpose > 0 ? '+' : ''}${MidiPlayer.settings.transpose}`
           + ` · 轨道 ${MidiPlayer.activeTrackLabel || '默认'} · 超域 ${MidiPlayer.settings.rangeMode}</b>`
-          + ' 保存为这首曲子的专属配置？<br><span class="dim">练习/演奏两种模式、钢琴/吉他两种乐器加载时都会自动套用。</span>';
-        spModal.classList.remove('hidden');
+          + ' 保存为这首曲子的专属配置？<br><span class="dim">练习/演奏两种模式、钢琴/吉他两种乐器加载时都会自动套用。</span>',
+          '保存',
+          () => {
+            this.saveSongParams({
+              speed: MidiPlayer.speed,
+              transpose: MidiPlayer.settings.transpose,
+              trackSel: MidiPlayer.settings.trackSel,
+              customTracks: MidiPlayer.settings.customTracks,
+              rangeMode: MidiPlayer.settings.rangeMode,
+            });
+            this.toast(`已保存「${title}」的专属参数`, 'success');
+            this.log(`已保存「${title}」的专属参数：速度 ${MidiPlayer.speed.toFixed(2)}× · 移调 ${MidiPlayer.settings.transpose > 0 ? '+' : ''}${MidiPlayer.settings.transpose} · 超域 ${MidiPlayer.settings.rangeMode}`, 'info');
+          },
+        );
       });
-      const spClose = () => spModal.classList.add('hidden');
-      document.getElementById('sp-cancel').addEventListener('click', spClose);
-      spModal.querySelector('.lib-backdrop').addEventListener('click', spClose);
-      document.getElementById('sp-ok').addEventListener('click', () => {
-        const id = MidiPlayer.currentEntryId;
-        if (!id) { spClose(); return; }
-        this.saveSongParams({
-          speed: MidiPlayer.speed,
-          transpose: MidiPlayer.settings.transpose,
-          trackSel: MidiPlayer.settings.trackSel,
-          customTracks: MidiPlayer.settings.customTracks,
-          rangeMode: MidiPlayer.settings.rangeMode,
-        });
-        spClose();
-        const title = el.songName.textContent || '当前乐曲';
-        this.log(`已保存「${title}」的专属参数：速度 ${MidiPlayer.speed.toFixed(2)}× · 移调 ${MidiPlayer.settings.transpose > 0 ? '+' : ''}${MidiPlayer.settings.transpose} · 超域 ${MidiPlayer.settings.rangeMode}`, 'info');
+
+      /* 拖拽 MIDI 文件进窗口 = 导入（带确认） */
+      window.addEventListener('dragover', (e) => { e.preventDefault(); });
+      window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const files = [...((e.dataTransfer && e.dataTransfer.files) || [])].filter((f) => /\.(midi?|rmi)$/i.test(f.name));
+        if (!files.length) return;
+        const names = files.map((f) => f.name).join('、');
+        this.spOpen(
+          `导入 ${files.length} 个 MIDI 文件`,
+          `<b>${names.length > 90 ? names.slice(0, 90) + '…' : names}</b><br><span class="dim">将复制一份加入曲库${files.length ? '，并载入第一首' : ''}。</span>`,
+          '导入',
+          () => {
+            if (window.yihuan && window.yihuan.isElectron) {
+              this.importMidiFiles(files.map((f) => f.path).filter(Boolean));
+            } else {
+              const dt = new DataTransfer();
+              files.forEach((f) => dt.items.add(f));
+              el.fileInput.files = dt.files;
+              el.fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          },
+        );
       });
 
       el.trackSel.addEventListener('change', () => {
@@ -279,18 +315,34 @@
         });
       });
 
-      /* 自定义颜色输入 */
+      /* 自定义颜色输入（选中的颜色同时填进 ＋ 按钮，给"改成功"反馈） */
       var wfMelodyInput = document.getElementById('wf-custom-melody');
       var wfAccInput = document.getElementById('wf-custom-acc');
       var themeCustomInput = document.getElementById('theme-custom');
       if (wfMelodyInput && wfAccInput) {
-        var applyWFCustom = function() { UI.applyNoteColors(wfMelodyInput.value, wfAccInput.value); UI.saveSettings(); };
+        var applyWFCustom = function() {
+          UI.applyNoteColors(wfMelodyInput.value, wfAccInput.value);
+          UI.fillCustomSwatch('wf-custom-melody', wfMelodyInput.value);
+          UI.fillCustomSwatch('wf-custom-acc', wfAccInput.value);
+          UI.saveSettings();
+        };
         wfMelodyInput.addEventListener('input', applyWFCustom);
         wfAccInput.addEventListener('input', applyWFCustom);
       }
       if (themeCustomInput) {
-        themeCustomInput.addEventListener('input', function() { UI.applyAccent(themeCustomInput.value); UI.saveSettings(); });
+        themeCustomInput.addEventListener('input', function() {
+          UI.applyAccent(themeCustomInput.value);
+          UI.fillCustomSwatch('theme-custom', themeCustomInput.value);
+          UI.saveSettings();
+        });
       }
+      document.getElementById('echo-custom').addEventListener('input', (e) => {
+        this._echoRainbow = false;
+        this._echoColor = e.target.value;
+        this.applyEchoColor();
+        this.fillCustomSwatch('echo-custom', e.target.value);
+        this.saveSettings();
+      });
       document.getElementById('set-guitar-sustain').addEventListener('click', () => {
         const sw = document.getElementById('set-guitar-sustain');
         if (sw.disabled) return;
@@ -806,7 +858,7 @@
         let song;
         try { song = MidiSource.parse(res.data); }
         catch (err) { this.log(`解析失败：${name}（${err.message}）`, 'err'); continue; }
-        const title = song.name || name.replace(/\.(midi?|rmi)$/i, '') || '未命名';
+        const title = name.replace(/\.(midi?|rmi)$/i, '') || '未命名'; /* 文件名做标题，防内嵌乐器名撞车 */
         if (have.has(title.trim().toLowerCase())) { skipped.push(title); continue; }
         have.add(title.trim().toLowerCase());
         added.push(title);
@@ -814,7 +866,7 @@
         Library.add({ srcPath: p, data: res.data, title, meta }).then((ent) => {
           if (!loadedFirst) {
             loadedFirst = true;
-            this.loadSong(res.data, name, ent && ent.id); /* 第一首新曲直接载入播放器 */
+            this.loadSong(res.data, title, ent && ent.id); /* 第一首新曲直接载入播放器 */
           }
         });
       }
@@ -1066,7 +1118,7 @@
       { name: '柠檬×薄荷', melody: '#f8e8a0', acc: '#a8d8c0' },
     ],
     applyGuitarSustain(on) {
-      this._guitarSustain = on !== false;
+      this._guitarSustain = on === true;
       const sw = document.getElementById('set-guitar-sustain');
       if (sw) {
         sw.classList.toggle('on', this._guitarSustain);
@@ -1120,7 +1172,7 @@
       row.innerHTML = '';
       this.THEMES.forEach((t) => {
         var card = document.createElement('button');
-        card.className = 'theme-card';
+        card.className = 'theme-card' + (t.name === this._theme ? ' active' : ''); /* 启动恢复的主题要标高亮 */
         card.dataset.name = t.name;
         card.innerHTML = '<span class=\"tc-name\">' + t.name + '</span><span class=\"tc-dots\">' +
           [t.vars['--accent'], t.melody, t.acc].map(function(c){ return '<span class=\"tc-dot\" style=\"background:' + c + '\"></span>'; }).join('') + '</span>';
@@ -1150,11 +1202,35 @@
       const show = Keyboard.instrument === 'guitar' && Perf.active;
       wrap.classList.toggle('hidden', !show);
       const sw = document.getElementById('set-guitar-sustain');
-      if (sw) sw.setAttribute('aria-checked', String(this._guitarSustain !== false));
+      if (sw) sw.setAttribute('aria-checked', String(this._guitarSustain === true));
       /* 按键时长仅吉他需要（钢琴固定 25ms）：钢琴模式下隐藏该控件 */
       const holdRow = document.getElementById('perf-hold-row');
       if (holdRow) holdRow.classList.toggle('hidden', Keyboard.instrument !== 'guitar');
     },
+    /* 飘窗提示：短消息居中弹出，自动消失（批量操作等即时反馈） */
+    toast(msg, type = 'info') {
+      let wrap = document.getElementById('toast-wrap');
+      if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.id = 'toast-wrap';
+        document.body.appendChild(wrap);
+      }
+      const t = document.createElement('div');
+      t.className = 'toast toast-' + type;
+      t.textContent = msg;
+      wrap.appendChild(t);
+      requestAnimationFrame(() => t.classList.add('show'));
+      setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 320); }, 2600);
+    },
+
+    /* 把选中的颜色填进自定义取色的 ＋ 按钮，给"改成功"的视觉反馈 */
+    fillCustomSwatch(inputId, color) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const label = inp.closest('.swatch-custom');
+      if (label) { label.style.background = color; label.style.color = '#fff'; }
+    },
+
     openSettings() {
       document.getElementById('settings-modal').classList.remove('hidden');
       this.applyEchoColor(); /* 同步选中环 */
@@ -1178,8 +1254,8 @@
         echoRainbow: !!this._echoRainbow,
         themeAccent: this._themeAccent || '#e9576e',
         particles: this._particles !== false,
-        guitarSustain: this._guitarSustain !== false,
-        themeName: this._theme || '玫瑰之夜',
+        guitarSustain: !!this._guitarSustain,
+        themeName: this._theme || '经典',
         melodyColor: this._melodyColor || '#e9576e',
         accColor: this._accColor || '#4f7cf0',
         hints: Keyboard.hintsVisible,
@@ -1228,19 +1304,25 @@
         el.instPiano.classList.toggle('active', s.instrument === 'piano');
         el.instGuitar.classList.toggle('active', s.instrument === 'guitar');
       }
-      /* 个性化：回声色彩 / 主题色 / 粒子（默认样式 = 全新用户的所见） */
+      /* 个性化：整套主题 → 回声色彩 → 主题色 → 粒子（后设置的覆盖前面的） */
+      const themeName = (typeof s.themeName === 'string' && this.THEMES.some((t) => t.name === s.themeName)) ? s.themeName : '经典';
+      this.applyTheme(this.THEMES.find((t) => t.name === themeName));
       this._echoColor = (typeof s.echoColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.echoColor)) ? s.echoColor : '#39b98c';
       this._echoRainbow = !!s.echoRainbow;
       this.applyEchoColor();
       this.applyAccent((typeof s.themeAccent === 'string' && /^#[0-9a-f]{6}$/i.test(s.themeAccent)) ? s.themeAccent : '#e9576e');
       this.applyParticles(s.particles !== false);
       this.applyNoteColors((typeof s.melodyColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.melodyColor)) ? s.melodyColor : '#e9576e', (typeof s.accColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.accColor)) ? s.accColor : '#4f7cf0');
-      /* 自定义取色器回显当前生效颜色 */
+      /* 自定义取色器回显当前生效颜色，并把选中的颜色填进 ＋ 按钮（有"改成功"的反馈） */
       var wm = document.getElementById('wf-custom-melody'), wa = document.getElementById('wf-custom-acc'), tc = document.getElementById('theme-custom');
       if (wm) wm.value = this._melodyColor;
       if (wa) wa.value = this._accColor;
       if (tc) tc.value = this._themeAccent;
-      this._guitarSustain = s.guitarSustain !== false;
+      this.fillCustomSwatch('wf-custom-melody', this._melodyColor);
+      this.fillCustomSwatch('wf-custom-acc', this._accColor);
+      this.fillCustomSwatch('theme-custom', this._themeAccent);
+      this.fillCustomSwatch('echo-custom', this._echoColor);
+      this._guitarSustain = s.guitarSustain === true; /* 吉他延音默认关闭，显式开启过才记忆为开 */
       this.applyGuitarSustain(this._guitarSustain);
       if (s.teaching && s.teaching !== 'off') {
         el.teachSel.value = s.teaching;

@@ -958,3 +958,37 @@ body.no-hints .key .hint { opacity: 0; }
   border-radius: 8px; padding: 5px 9px; font-size: 12px; outline: none;
 }
 .lib-catpop .cat-new input:focus { border-color: var(--accent); }
+
+/* ═══════════ 空状态 / 飘窗 / 搜索 ═══════════ */
+/* 空状态纯提示：不能拦截下方按钮的点击（批量清空后弹窗内所有按钮失灵的根源） */
+.lib-empty { pointer-events: none; }
+
+#toast-wrap {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 300; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  padding: 9px 18px; border-radius: 999px;
+  font-size: 13px; font-weight: 650; color: #fff;
+  background: rgba(35, 38, 47, 0.92);
+  box-shadow: 0 8px 26px rgba(23, 26, 36, 0.3);
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity 0.25s, transform 0.25s var(--ease-out);
+  max-width: 78vw;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast-success { background: rgba(47, 152, 106, 0.95); }
+.toast-warn { background: rgba(214, 156, 53, 0.95); }
+.toast-err { background: rgba(214, 69, 83, 0.95); }
+
+/* 批量操作按钮禁用态 */
+.lib-batchbtns .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 曲名搜索 */
+.lib-search {
+  width: 150px; border: 1px solid rgba(35, 38, 47, 0.16); border-radius: 999px;
+  padding: 6px 12px; font-size: 12px; outline: none;
+  background: rgba(255, 255, 255, 0.7); transition: width 0.2s var(--ease-out), border-color 0.15s;
+}
+.lib-search:focus { border-color: var(--accent); width: 190px; }

@@ -102,6 +102,14 @@ const Library = {
     this.els.catPop.addEventListener('click', (e) => e.stopPropagation());
     document.addEventListener('click', () => this.els.catPop.classList.add('hidden'));
 
+    /* 曲名搜索 */
+    this.search = '';
+    this.els.search = document.getElementById('lib-search');
+    if (this.els.search) {
+      this.els.search.addEventListener('input', () => { this.search = this.els.search.value; this.render(); });
+      this.els.search.addEventListener('keydown', (e) => { if (e.key === 'Escape') { this.els.search.value = ''; this.search = ''; this.render(); } });
+    }
+
     this._initPromise = this.refresh().then(() => this.seedBuiltins());
     return this._initPromise;
   },
@@ -270,6 +278,12 @@ const Library = {
 
   updateBatchBar() {
     this.els.batchCount.textContent = `已选 ${this.selected.size} 首`;
+    /* 无选中时禁用删除/清参数/分类操作 */
+    const none = this.selected.size === 0;
+    for (const id of ['lib-del', 'lib-clearparams', 'lib-cat-add', 'lib-cat-rm']) {
+      const b = document.getElementById(id);
+      if (b) b.disabled = none;
+    }
   },
 
   toggleSelect(id) {
@@ -278,22 +292,37 @@ const Library = {
     this.updateBatchBar();
   },
 
-  /* 批量分类弹层：mode = 'add' | 'remove' */
+  /* 批量分类弹层：mode = 'add' | 'remove'
+   * add：列出曲库全部已有分类（+新建）；remove：只列出选中曲目实际拥有的分类，
+   * 所选曲目都没有分类时提示且不弹层 */
   showBatchCatPop(mode) {
     const pop = this.els.catPop;
+    if (!this.selected.size) { UI.toast('请先勾选要操作的曲目', 'warn'); return; }
     pop.innerHTML = '';
     const head = document.createElement('div');
     head.className = 'cat-head';
     head.textContent = (mode === 'add' ? '添加到分类' : '移出分类') + `（已选 ${this.selected.size} 首）`;
     pop.appendChild(head);
 
-    /* 收集全部曲库出现过的分类 */
-    const counts = new Map();
-    for (const en of this.entries) {
-      for (const c of en.categories || []) counts.set(c, (counts.get(c) || 0) + 1);
+    let counts = new Map();
+    if (mode === 'add') {
+      for (const en of this.entries) {
+        for (const c of en.categories || []) counts.set(c, (counts.get(c) || 0) + 1);
+      }
+    } else {
+      /* 移出模式：只统计选中曲目的分类 */
+      for (const id of this.selected) {
+        const en = this.entries.find((e) => e.id === id);
+        for (const c of (en && en.categories) || []) counts.set(c, (counts.get(c) || 0) + 1);
+      }
     }
     const cats = [...counts.keys()];
     if (!cats.length) {
+      if (mode === 'remove') {
+        pop.classList.add('hidden');
+        UI.toast('所选曲目都没有分类，无需移除', 'warn');
+        return;
+      }
       const none = document.createElement('div');
       none.className = 'cat-none';
       none.textContent = '还没有分类，在下方新建一个';
@@ -302,7 +331,7 @@ const Library = {
     for (const c of cats) {
       const b = document.createElement('button');
       b.className = 'cat-item';
-      b.innerHTML = `<span>${c}</span><span class="cnt">${counts.get(c)} 首</span>`;
+      b.innerHTML = `<span>${c}</span><span class="cnt">${mode === 'add' ? counts.get(c) + ' 首' : '选中 ' + counts.get(c) + ' 首'}</span>`;
       b.addEventListener('click', () => { this.applyBatchCategories(mode, c); pop.classList.add('hidden'); });
       pop.appendChild(b);
     }
@@ -356,6 +385,7 @@ const Library = {
     await this.refresh();
     this.render();
     const name = mode === 'add' ? '已添加到分类' : '已移出分类';
+    UI.toast(`${name}「${cat}」（${ids.length} 首）`, 'success');
     UI.log(`${name}「${cat}」：${ids.length} 首`, 'info');
   },
 
@@ -379,6 +409,7 @@ const Library = {
     this.els.delBtn.classList.remove('confirming');
     this.render();
     this.updateBatchBar();
+    UI.toast(`已删除 ${ids.length} 首乐曲`, 'success');
     UI.log(`已删除 ${ids.length} 首乐曲`, 'info');
   },
 
@@ -390,6 +421,7 @@ const Library = {
       for (const id of ids) delete all[id];
       localStorage.setItem(UI.SONG_PARAMS_KEY, JSON.stringify(all));
     } catch { /* 忽略 */ }
+    UI.toast(`已清除 ${ids.length} 首乐曲的独立参数`, 'success');
     UI.log(`已清除 ${ids.length} 首乐曲的独立参数（速度/移调/轨道/超域）`, 'info');
   },
 
@@ -420,6 +452,9 @@ const Library = {
 
   visibleEntries() {
     let list = this.entries.filter((e) => this.filterCat === '全部' || (e.categories || []).includes(this.filterCat));
+    /* 曲名搜索（不区分大小写） */
+    const q = (this.search || '').trim().toLowerCase();
+    if (q) list = list.filter((e) => String(e.title).toLowerCase().includes(q));
     const by = {
       recent: (a, b) => b.addedAt - a.addedAt,
       name: (a, b) => a.title.localeCompare(b.title, 'zh'),
