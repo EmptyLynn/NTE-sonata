@@ -620,7 +620,12 @@
       const appEl = document.getElementById('app');
       if (!appEl) return;
       this._fitLast = '';
-      const apply = () => {
+      const apply = (force) => {
+        /* 模式切换过渡期跳过：窗口高度自适应（IPC 异步）尚未完成时，
+         * 用旧窗高+新内容高会算出错误的临时 zoom——练习→演奏时界面
+         * "缩一下约 1 秒后恢复"的根源。窗口 resize 驱动的重算不受影响
+         * （那一刻窗口已到位，算出来就是正确值）。 */
+        if (!force && performance.now() < (this._fitHoldUntil || 0)) return;
         /* 手机宽度走真·移动端布局（CSS 重排），等比缩放只服务桌面小窗 */
         if (window.matchMedia('(max-width: 560px)').matches) {
           if (this._fitLast !== 'mobile') {
@@ -652,16 +657,16 @@
         Viz._resize();
         Viz._resizeEcho();
       };
-      window.addEventListener('resize', apply);
+      window.addEventListener('resize', () => apply(true));
       /* 拖边连续缩放时画布逐帧重建可能有过渡帧模糊：结束后 160ms 补一次最终排版 */
       let resizeSettle = null;
       window.addEventListener('resize', () => {
         clearTimeout(resizeSettle);
-        resizeSettle = setTimeout(apply, 160);
+        resizeSettle = setTimeout(() => apply(true), 160);
       });
-      /* 轻量巡检：内容增删（日志增长/面板开合）后兜底重算 */
-      setInterval(apply, 800);
-      apply();
+      /* 轻量巡检：内容增删（日志增长/面板开合）后兜底重算（受过渡期保持约束） */
+      setInterval(() => apply(), 800);
+      apply(true);
     },
 
     /* ---------------- 键盘谱 TXT 导出 ----------------
@@ -776,6 +781,7 @@
     /* ---------------- 模式切换回调（Perf.setActive 调用） */
     onModeChanged(perfOn) {
       if (Teaching.active) Teaching.stop();
+      this._fitHoldUntil = performance.now() + 700; /* 模式切换过渡期：巡检暂停，等窗口高度自适应到位 */
       window.VizSource = perfOn ? Perf : MidiPlayer;
       if (perfOn) {
         MidiPlayer.stop();

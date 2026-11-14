@@ -3,13 +3,13 @@
 
 !define APP_NAME "异环乐器模拟器"
 !define APP_EXE "YihuanInstrument.exe"
-!define APP_VERSION "1.1.12"
+!define APP_VERSION "1.1.13"
 !define APP_PUBLISHER "b站 @林羽empty"
 !define MUI_ICON "D:\JOY\异环钢琴模拟器Zcode\build\icon.ico"
 !define MUI_UNICON "D:\JOY\异环钢琴模拟器Zcode\build\icon.ico"
 
 Name "${APP_NAME}"
-OutFile "D:\JOY\异环钢琴模拟器Zcode\dist12\YihuanInstrument-Setup-1.1.12.exe"
+OutFile "D:\JOY\异环钢琴模拟器Zcode\dist12\YihuanInstrument-Setup-1.1.13.exe"
 InstallDir "$LOCALAPPDATA\Programs\YihuanInstrument"
 InstallDirRegKey HKCU "Software\YihuanInstrument" "InstallDir"
 RequestExecutionLevel user
