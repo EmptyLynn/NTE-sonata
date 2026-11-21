@@ -73,10 +73,10 @@ const Perf = {
       this.savePrefs();
       this.updateStatus();
     });
-    this.els.hold.addEventListener('change', () => {
+    this.els.hold.addEventListener('input', () => {
       this.holdMs = Math.max(10, Math.min(120, parseInt(this.els.hold.value, 10) || 25));
       this.savePrefs();
-      /* 按键时长不影响调度时序：演奏中也可实时调整，后续和弦即刻生效 */
+      /* 按键时长不影响调度时序：演奏中实时调整，后续和弦即刻生效 */
       if (this.active && this.state === 'playing' && window.yihuan && window.yihuan.perfHold) {
         window.yihuan.perfHold(this.instrumentHoldMs());
       }

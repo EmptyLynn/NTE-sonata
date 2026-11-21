@@ -602,12 +602,18 @@
       MidiPlayer.toggle();
     },
 
-    /* 窗口高度自适应内容（桌面版）：加载后与切模式后调用，保证无滚动条 */
+    /* 窗口高度自适应内容（桌面版）：加载后与切模式后调用，保证无滚动条。
+     * 防抖 120ms + 缩放巡检保持：窗口尺寸即将变化，期间不重算 zoom
+     * （否则用过渡期的脏尺寸算出临时 zoom，界面闪一下约 1 秒后恢复） */
     fitWindowHeight() {
       if (!window.yihuan || !window.yihuan.fitWindowHeight) return;
-      requestAnimationFrame(() => {
-        window.yihuan.fitWindowHeight(document.documentElement.scrollHeight);
-      });
+      this._fitHoldUntil = performance.now() + 700;
+      clearTimeout(this._fwhTimer);
+      this._fwhTimer = setTimeout(() => {
+        requestAnimationFrame(() => {
+          window.yihuan.fitWindowHeight(document.documentElement.scrollHeight);
+        });
+      }, 120);
     },
 
     /* ---------------- 整体等比缩放（小窗/K1 便携屏/笔记本兜底） ----------------
@@ -762,6 +768,7 @@
       document.body.classList.toggle('guitar-mode', id === 'guitar');
       this.log(`已切换乐器：${id === 'guitar' ? '🎸 吉他（E3–D#6）' : '🎹 钢琴（C3–B5）'}`, 'info');
       this.updateGuitarSwitch();
+      this.fitWindowHeight(); /* 音域/瀑布流布局变化：窗口高度自适应 + 缩放巡检保持 */
       this.saveSettings();
     },
 
@@ -921,7 +928,12 @@
       const restored = this.applySongParams();
       this.refreshTransport();
       this.refreshProgress();
-      if (Perf.active) Perf.rebuild();
+      if (Perf.active) {
+        Perf.rebuild();
+        /* 换曲：进度条归零（rebuild 不重置显示位置，ended 后残留的终点位置会带进新曲） */
+        Perf._dispT = 0;
+        Perf._dispAt = performance.now();
+      }
       this.log(`已加载「${displayTitle}」：${song.trackCount} 轨 ${song.totalNotes} 音符`
         + (song.key ? ` · ${song.key}` : '')
         + (embeddedName ? ` · 内嵌名「${embeddedName}」` : '')
